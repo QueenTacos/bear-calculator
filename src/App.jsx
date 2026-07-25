@@ -14,96 +14,102 @@ const LS = {
 }
 
 // ── Hybrid storage: localStorage first, Supabase in background ─
+// ── Sync status tracker ──────────────────────────────────────
+let _syncStatus = 'unknown' // 'ok'|'error'|'unknown'
+let _syncError  = null
+export const getSyncStatus = () => ({ status: _syncStatus, error: _syncError })
+
 export const stor = {
   // ── Players ──────────────────────────────────────────────────
   async getPlayer(gamerID) {
     const key = `syp_player_${gamerID.toLowerCase()}`
-    // Try Supabase first for freshest data
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('players').select('*')
           .eq('gamer_id', gamerID.toLowerCase()).single()
         if (!error && data?.profile_data) {
-          LS.set(key, data.profile_data) // cache locally
+          _syncStatus = 'ok'
+          LS.set(key, data.profile_data)
           return data.profile_data
         }
-      } catch {}
+        if (error && error.code !== 'PGRST116') { // PGRST116 = not found (ok)
+          _syncStatus = 'error'; _syncError = error.message
+        }
+      } catch(e) { _syncStatus = 'error'; _syncError = e.message }
     }
-    // Fall back to localStorage
     return LS.get(key)
   },
 
   async setPlayer(gamerID, profileData) {
     const key = `syp_player_${gamerID.toLowerCase()}`
-    // Always save locally first (instant, reliable)
     LS.set(key, profileData)
-    // Sync to Supabase in background
     if (supabase) {
       try {
-        await supabase.from('players').upsert({
+        const { error } = await supabase.from('players').upsert({
           gamer_id: gamerID.toLowerCase(),
           profile_data: profileData,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'gamer_id' })
-      } catch(e) { console.warn('Supabase sync failed (data saved locally):', e) }
+        if (error) { _syncStatus = 'error'; _syncError = error.message; return false }
+        _syncStatus = 'ok'; _syncError = null; return true
+      } catch(e) { _syncStatus = 'error'; _syncError = e.message; return false }
     }
+    return false
   },
 
   async getAllPlayers() {
-    // Try Supabase for cross-device data
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('players').select('gamer_id, profile_data, updated_at')
           .order('updated_at', { ascending: false })
-        if (!error && data?.length) {
-          // Also cache each player locally
+        if (!error && data) {
+          _syncStatus = 'ok'
           data.forEach(r => r.profile_data &&
             LS.set(`syp_player_${r.gamer_id}`, r.profile_data))
           return data.map(r => r.profile_data).filter(Boolean)
         }
-      } catch {}
+        if (error) { _syncStatus = 'error'; _syncError = error.message }
+      } catch(e) { _syncStatus = 'error'; _syncError = e.message }
     }
-    // Fall back: gather all locally cached players
-    return LS.keys()
-      .filter(k => k.startsWith('syp_player_'))
-      .map(k => LS.get(k)).filter(Boolean)
+    return LS.keys().filter(k => k.startsWith('syp_player_')).map(k => LS.get(k)).filter(Boolean)
   },
 
-  // ── Hero images ───────────────────────────────────────────────
+  // ── Hero images — saved one at a time, compressed ─────────────
   async getAllHeroImages() {
-    // Try Supabase
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('hero_images').select('hero_id, image_data')
         if (!error && data?.length) {
           const imgs = Object.fromEntries(data.map(r => [r.hero_id, r.image_data]))
-          LS.set('syp_hero_images', imgs) // cache
+          LS.set('syp_hero_images', imgs)
+          _syncStatus = 'ok'
           return imgs
         }
-      } catch {}
+      } catch(e) { _syncStatus = 'error'; _syncError = e.message }
     }
-    // Fall back to localStorage cache
     return LS.get('syp_hero_images') || {}
   },
 
   async setHeroImage(heroId, imageData) {
-    // Save to local cache immediately
+    // Always update local cache
     const cache = LS.get('syp_hero_images') || {}
     cache[heroId] = imageData
     LS.set('syp_hero_images', cache)
-    // Sync to Supabase
     if (supabase) {
       try {
-        await supabase.from('hero_images').upsert({
+        const { error } = await supabase.from('hero_images').upsert({
           hero_id: heroId,
           image_data: imageData,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'hero_id' })
-      } catch(e) { console.warn('Hero image Supabase sync failed:', e) }
+        if (error) { _syncStatus = 'error'; _syncError = `Image sync: ${error.message}`; return false }
+        _syncStatus = 'ok'; return true
+      } catch(e) { _syncStatus = 'error'; _syncError = e.message; return false }
     }
+    return false
   },
 }
 
@@ -114,8 +120,8 @@ const ADMIN_ID   = "yumqueentacos@gmail.com";
 const ALLIANCE   = "SYP";
 const ADMIN_NAME = "Queen Tacos";
 
-// ── IMAGE COMPRESSION (canvas-based, works in real browser) ─
-async function compressToBase64(file, maxPx=96, quality=0.75) {
+// ── IMAGE COMPRESSION — max 80px, JPEG 0.65 keeps images under 30KB each
+async function compressToBase64(file, maxPx=80, quality=0.65) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -292,7 +298,7 @@ function calcHeroScore(hs){
 // Slot 2: any owned hero that is NOT a slot3_cap-only hero
 // Slot 3: any owned hero (slot3_cap heroes only allowed here)
 // Each hero used only once across all squads
-function recommendAll(states,isRally,joinCount){
+function recommendAll(states,isRally,joinCount,override={}){
   const o=id=>states[id]?.owned,s=id=>states[id]?.stars??0;
   const used=new Set();
 
@@ -347,21 +353,32 @@ function recommendAll(states,isRally,joinCount){
     .filter(h=>h.g!=='epic'&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id))
     .map(h=>({id:h.id}));
 
-  // ── Rally Lead — gets first pick ────────────────────────────
+  // ── Rally Lead — override takes priority, then auto ────────
+  const joinS1Locked=new Set(['jessie','jasser','seo_yoon','philly']);
   const rally={s1:null,s2:null,s3:null};
   if(isRally){
-    // Slot 1: Jeronimo best if 3+ stars, then Hector > Magnus > Gregory
-    rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
-    if(rally.s1){
-      // Slot 2: Mia maxed (5★) always best, then Molly > Mia(3+★) > Reina(4+★) > Sonya > Renee
-      if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
-      else{
-        rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'renee'},{id:'reina'}]);
-        if(!rally.s2)rally.s2=pick(HEROES.filter(h=>!capOnly.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id})));
+    // Apply manual overrides first (player's choice, can be any owned non-joinS1Locked hero)
+    ['s1','s2','s3'].forEach(slot=>{
+      const id=override[slot];
+      if(id&&o(id)&&!used.has(id)&&!joinS1Locked.has(id)){
+        rally[slot]=id; used.add(id);
       }
-      // Slot 3: Ligeia→Rufus→...→Bahiti best to good
-      rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
-      if(!rally.s3)rally.s3=pick(fullAnyPool());
+    });
+    // Auto-fill any slots not overridden
+    if(!rally.s1) rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
+    if(rally.s1||override.s1){
+      // Only fill s2/s3 if s1 is filled (either by override or auto)
+      if(!rally.s2){
+        if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
+        else{
+          rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'renee'},{id:'reina'}]);
+          if(!rally.s2)rally.s2=pick([...HEROES].sort(bySeasonDesc).filter(h=>!capOnly.has(h.id)&&!joinS1Locked.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id})));
+        }
+      }
+      if(!rally.s3){
+        rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
+        if(!rally.s3)rally.s3=pick(fullAnyPool());
+      }
     }
   }
 
@@ -810,6 +827,28 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
   const [saving,setSaving]=useState(false);
   const [saveErr,setSaveErr]=useState('');
   const [imgCount,setIC]=useState(0);
+  const [rallyOverride,setRallyOverride]=useState(player.rallyOverride||{s1:null,s2:null,s3:null});
+  const [pickerSlot,setPickerSlot]=useState(null); // 's1'|'s2'|'s3'|null
+  const [syncOk,setSyncOk]=useState(true);
+  const [syncMsg,setSyncMsg]=useState('');
+
+  const forceSync=useCallback(async()=>{
+    setSyncMsg('Syncing…');
+    const pd={...player,heroStates,marchCap,joinCount,isRally,maxSend,
+      infantry,lancer,marksman,rallyRatio,joinRatio,rallyOverride,updatedAt:Date.now()};
+    const ok=await stor.setPlayer(gid,pd);
+    // Also sync any images from localStorage cache to Supabase
+    const cache=LS.get('syp_hero_images')||{};
+    let imgOk=true;
+    for(const[hid,data]of Object.entries(cache)){
+      const r=await stor.setHeroImage(hid,data);
+      if(!r)imgOk=false;
+    }
+    const s=getSyncStatus();
+    setSyncOk(ok&&imgOk);
+    setSyncMsg(ok&&imgOk?'☁ All synced!':s.error||'Sync failed — check Supabase connection');
+    setTimeout(()=>setSyncMsg(''),4000);
+  },[gid,heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,rallyRatio,joinRatio,rallyOverride]);
   const [rallyRatio,setRallyRatio]=useState(player.rallyRatio||{inf:5,lan:5,mark:90});
   const [joinRatio,setJoinRatio]=useState(player.joinRatio||{inf:10,lan:10,mark:80});
   const [submitted,setSubmitted]=useState(false);
@@ -827,12 +866,12 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
     setSaving(true);
     const t=setTimeout(async()=>{
       const pd={...player,heroStates,marchCap,joinCount,isRally,maxSend,
-        infantry,lancer,marksman,rallyRatio,joinRatio,updatedAt:Date.now()};
+        infantry,lancer,marksman,rallyRatio,joinRatio,rallyOverride,updatedAt:Date.now()};
       await stor.setPlayer(gid,pd);
       setSaving(false);
     },1000);
     return()=>clearTimeout(t);
-  },[heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,rallyRatio,joinRatio]);
+  },[heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,rallyRatio,joinRatio,rallyOverride]);
 
   const toggleOwned=useCallback(id=>setHS(p=>({...p,[id]:{...p[id],owned:!p[id].owned}})),[]);
   const setStars=useCallback((id,s)=>setHS(p=>({...p,[id]:{...p[id],stars:s}})),[]);
@@ -842,7 +881,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
   },[gid]);
 
   const ownedCount=useMemo(()=>Object.values(heroStates).filter(s=>s.owned).length,[heroStates]);
-  const recs=useMemo(()=>recommendAll(heroStates,isRally,joinCount),[heroStates,isRally,joinCount]);
+  const recs=useMemo(()=>recommendAll(heroStates,isRally,joinCount,rallyOverride),[heroStates,isRally,joinCount,rallyOverride,heroStates]);
   const totalPower=useMemo(()=>calcTroopPower(infantry,lancer,marksman),[infantry,lancer,marksman]);
 
   const grouped=useMemo(()=>{const m={};HEROES.forEach(h=>{if(!m[h.g])m[h.g]=[];m[h.g].push(h);});return m;},[]);
@@ -872,7 +911,9 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           {player.isAdmin&&<span style={{fontSize:10,color:'#f59e0b',background:'#f59e0b22',
             border:'1px solid #f59e0b44',borderRadius:99,padding:'2px 8px',fontWeight:700}}>ADMIN</span>}
-          {onSwitchToAdmin&&<Btn onClick={onSwitchToAdmin} small color='#f59e0b'>⚡ Admin Panel</Btn>}
+          {syncMsg&&<span style={{fontSize:10,color:syncOk?'#34d399':'#f87171'}}>{syncMsg}</span>}
+          <Btn onClick={forceSync} small color='#34d399'>☁ Sync</Btn>
+          {onSwitchToAdmin&&<Btn onClick={onSwitchToAdmin} small color='#f59e0b'>⚡ Admin</Btn>}
           <Btn onClick={onLogout} outline small color='#6d4a90'>Log Out</Btn>
         </div>
       </div>
@@ -1086,9 +1127,98 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
                     Rally: {ni(rallyRatio?.mark)||90}% mark / {ni(rallyRatio?.lan)||5}% lan / {ni(rallyRatio?.inf)||5}% inf · Joins: {ni(joinRatio?.mark)||80}% mark / {ni(joinRatio?.lan)||10}% lan / {ni(joinRatio?.inf)||10}% inf
                   </div>
 
-                  {/* Rally card */}
-                  {isRally&&<SquadCard isRally={true} slotHeroes={recs.rally}
-                    dist={dist.rally} heroStates={heroStates} heroImages={heroImages}/>}
+                  {/* Rally card with hero override picker */}
+                  {isRally&&(()=>{
+                    const joinS1Locked=new Set(['jessie','jasser','seo_yoon','philly']);
+                    const eligibleHeroes=[...HEROES]
+                      .sort((a,b)=>{const p=h=>h.g==='epic'?0:h.g==='rare'?1:(parseInt(h.g.slice(1))||0)+2;return p(b)-p(a);})
+                      .filter(h=>heroStates[h.id]?.owned&&!joinS1Locked.has(h.id));
+                    return(
+                      <div style={{position:'relative'}}>
+                        <SquadCard isRally={true} slotHeroes={recs.rally}
+                          dist={dist.rally} heroStates={heroStates} heroImages={heroImages}/>
+                        <div style={{background:'#0d0920',border:'1px solid #3d1f60',
+                          borderRadius:10,padding:'12px 14px',marginTop:8}}>
+                          <div style={{fontSize:10,color:'#9d78c0',fontWeight:700,letterSpacing:'0.07em',marginBottom:10}}>
+                            ✏️ OVERRIDE RALLY HEROES
+                            <span style={{fontSize:9,color:'#5d3a80',fontWeight:400,marginLeft:8}}>
+                              Jessie · Jasser · Seo-yoon · Philly locked to joins
+                            </span>
+                          </div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                            {[{slot:'s1',label:'SLOT 1'},{slot:'s2',label:'SLOT 2'},{slot:'s3',label:'SLOT 3'}].map(({slot,label})=>{
+                              const ovId=rallyOverride[slot];
+                              const autoId=recs.rally[slot];
+                              const displayId=ovId||autoId;
+                              const isOpen=pickerSlot===slot;
+                              const takenByOther=new Set(['s1','s2','s3'].filter(s=>s!==slot).map(s=>rallyOverride[s]).filter(Boolean));
+                              return(
+                                <div key={slot} style={{position:'relative'}}>
+                                  <div style={{fontSize:8,color:'#6d4a90',marginBottom:4,letterSpacing:'0.06em',textAlign:'center'}}>{label}</div>
+                                  <div onClick={()=>setPickerSlot(isOpen?null:slot)} style={{
+                                    border:`1.5px solid ${ovId?'#e879f9':isOpen?'#7c3aed':'#3d1f60'}`,
+                                    borderRadius:8,padding:'6px 4px',textAlign:'center',cursor:'pointer',
+                                    background:ovId?'#1a0b35':'#0a0615',transition:'all .2s'}}>
+                                    {displayId?(()=>{const h=HMAP[displayId],g=GRP[h.g];return(
+                                      <div>
+                                        <div style={{width:32,height:32,borderRadius:6,margin:'0 auto 3px',
+                                          overflow:'hidden',border:`1.5px solid ${g.accent}`,
+                                          background:`linear-gradient(135deg,${g.bg},${g.accent}55)`,
+                                          display:'flex',alignItems:'center',justifyContent:'center',
+                                          fontSize:11,fontWeight:900,color:g.accent}}>
+                                          {heroImages[displayId]?<img src={heroImages[displayId]} alt={h.name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:ini(h.name)}
+                                        </div>
+                                        <div style={{fontSize:8,color:ovId?'#e879f9':'#9d78c0',fontWeight:ovId?700:400}}>{h.name}</div>
+                                        {ovId&&<div style={{fontSize:7,color:'#7c3aed'}}>✏ override</div>}
+                                      </div>);})(
+                                    ):<div style={{color:'#3d2060',fontSize:10,padding:'8px 0'}}>tap to set</div>}
+                                  </div>
+                                  {ovId&&<div onClick={()=>setRallyOverride(p=>({...p,[slot]:null}))}
+                                    style={{fontSize:8,color:'#6d4a90',textAlign:'center',marginTop:3,cursor:'pointer'}}>✕ clear override</div>}
+                                  {isOpen&&(
+                                    <div style={{position:'absolute',top:'100%',left:0,zIndex:999,
+                                      background:'#130928',border:'1.5px solid #7c3aed',borderRadius:12,
+                                      padding:10,maxHeight:280,overflowY:'auto',width:200,
+                                      boxShadow:'0 8px 32px rgba(0,0,0,.7)',marginTop:4}}>
+                                      <div style={{fontSize:9,color:'#9d78c0',marginBottom:8,fontWeight:700}}>SELECT HERO · {label}</div>
+                                      <div onClick={()=>{setRallyOverride(p=>({...p,[slot]:null}));setPickerSlot(null);}}
+                                        style={{display:'flex',alignItems:'center',gap:6,padding:'6px 8px',marginBottom:6,
+                                          cursor:'pointer',borderRadius:7,background:'#1a0b35',border:'1px solid #5b21b6'}}>
+                                        <span style={{fontSize:10}}>⚡</span>
+                                        <span style={{fontSize:10,color:'#a855f7',fontWeight:700}}>Auto (recommended)</span>
+                                      </div>
+                                      {eligibleHeroes.filter(h=>!takenByOther.has(h.id)).map(h=>{
+                                        const g=GRP[h.g],isSel=ovId===h.id;
+                                        return(
+                                          <div key={h.id} onClick={()=>{setRallyOverride(p=>({...p,[slot]:h.id}));setPickerSlot(null);}}
+                                            style={{display:'flex',alignItems:'center',gap:6,padding:'5px 7px',
+                                              marginBottom:4,borderRadius:7,cursor:'pointer',
+                                              background:isSel?`${g.accent}22`:'#0a0615',
+                                              border:`1px solid ${isSel?g.accent:'#2d1a4a'}`}}>
+                                            <div style={{width:24,height:24,borderRadius:5,flexShrink:0,overflow:'hidden',
+                                              border:`1px solid ${g.accent}`,
+                                              background:`linear-gradient(135deg,${g.bg},${g.accent}55)`,
+                                              display:'flex',alignItems:'center',justifyContent:'center',
+                                              fontSize:9,fontWeight:900,color:g.accent}}>
+                                              {heroImages[h.id]?<img src={heroImages[h.id]} alt={h.name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:ini(h.name)}
+                                            </div>
+                                            <div>
+                                              <div style={{fontSize:9,fontWeight:700,color:isSel?'#f0e6ff':'#9d78c0'}}>{h.name}</div>
+                                              <div style={{fontSize:7,color:g.accent}}>{g.label}</div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Join cards — each uses its own unique hero set */}
                   {dist.joins.map((j,i)=>(
