@@ -311,12 +311,15 @@ function recommendAll(states,isRally,joinCount){
     return null;
   };
 
-  // Join pools exclude rally-reserved heroes so rally specialists stay in rally
+  // Join slot 1 heroes — reserved ONLY for join slot 1, never slots 2-3
+  const joinS1Reserved=new Set(['jessie','jasser','seo_yoon','philly']);
+
+  // Join pools exclude rally-reserved AND join-slot-1-reserved heroes
   const flexPool=()=>HEROES.filter(h=>
-    !capOnly.has(h.id)&&!rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)
+    !capOnly.has(h.id)&&!rallyReserved.has(h.id)&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id)
   ).map(h=>({id:h.id}));
   const anyPool=()=>HEROES.filter(h=>
-    !rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)
+    !rallyReserved.has(h.id)&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id)
   ).map(h=>({id:h.id}));
   const fullAnyPool=()=>HEROES.filter(h=>o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
 
@@ -343,10 +346,21 @@ function recommendAll(states,isRally,joinCount){
   const epicIds=new Set(HEROES.filter(h=>h.g==='epic').map(h=>h.id));
   const nonEpicPool=()=>HEROES.filter(h=>!epicIds.has(h.id)&&!rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
 
+  // Joins 1-4 get their dedicated hero (if owned); joins 5-6 get next available
+  const dedicatedS1=['jessie','jasser','seo_yoon','philly'];
+
   const joins=[];
   for(let i=0;i<joinCount;i++){
-    const s1=pick(joinS1Approved);
-    // No slot 1 = no heroes at all
+    let s1=null;
+    if(i<4){
+      // Dedicated hero for this join slot — only this hero or null
+      const heroId=dedicatedS1[i];
+      if(o(heroId)&&!used.has(heroId)){s1=heroId;used.add(heroId);}
+    } else {
+      // Joins 5-6: pick any remaining approved join slot 1 hero
+      s1=pick(joinS1Approved);
+    }
+    // No slot 1 = no heroes at all for this squad
     const s2=s1?pick(flexPool()):null;
     // Joins 1-3 avoid epics; joins 4-6 open
     const s3=s1?(i<3?pick(nonEpicPool()):pick(anyPool())):null;
