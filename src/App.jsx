@@ -314,14 +314,38 @@ function recommendAll(states,isRally,joinCount){
   // Join slot 1 heroes — reserved ONLY for join slot 1, never slots 2-3
   const joinS1Reserved=new Set(['jessie','jasser','seo_yoon','philly']);
 
-  // Join pools exclude rally-reserved AND join-slot-1-reserved heroes
-  const flexPool=()=>HEROES.filter(h=>
-    !capOnly.has(h.id)&&!rallyReserved.has(h.id)&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id)
-  ).map(h=>({id:h.id}));
-  const anyPool=()=>HEROES.filter(h=>
-    !rallyReserved.has(h.id)&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id)
-  ).map(h=>({id:h.id}));
-  const fullAnyPool=()=>HEROES.filter(h=>o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
+  // Season priority: S17 best → S1 → Rare → Epic (lowest)
+  // Any hero not used by rally is available for join squads
+  const seasonPri=h=>{
+    if(h.g==='epic') return 0;
+    if(h.g==='rare') return 1;
+    return (parseInt(h.g.slice(1))||0)+2; // s1=3, s2=4 ... s17=19
+  };
+  const bySeasonDesc=(a,b)=>seasonPri(b)-seasonPri(a);
+
+  // Slot 2 pool: no cap-only, no join-s1 reserved, sorted S17→Epic
+  const flexPool=()=>[...HEROES]
+    .sort(bySeasonDesc)
+    .filter(h=>!capOnly.has(h.id)&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id))
+    .map(h=>({id:h.id}));
+
+  // Slot 3 pool (no join-s1 reserved): S17→Epic, cap-only heroes allowed in slot 3
+  const anyPool=()=>[...HEROES]
+    .sort(bySeasonDesc)
+    .filter(h=>!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id))
+    .map(h=>({id:h.id}));
+
+  // Full pool (rally slot 3 fallback): everything not used
+  const fullAnyPool=()=>[...HEROES]
+    .sort(bySeasonDesc)
+    .filter(h=>o(h.id)&&!used.has(h.id))
+    .map(h=>({id:h.id}));
+
+  // Non-epic pool for joins 1-3 slot 3: S17→Rare only (no epics in early joins)
+  const nonEpicPool=()=>[...HEROES]
+    .sort(bySeasonDesc)
+    .filter(h=>h.g!=='epic'&&!joinS1Reserved.has(h.id)&&o(h.id)&&!used.has(h.id))
+    .map(h=>({id:h.id}));
 
   // ── Rally Lead — gets first pick ────────────────────────────
   const rally={s1:null,s2:null,s3:null};
@@ -343,8 +367,8 @@ function recommendAll(states,isRally,joinCount){
 
   // ── Join Squads — slot 1 strictly approved, slots 2-3 open ──
   const joinS1Approved=[{id:'jessie'},{id:'jasser'},{id:'seo_yoon'},{id:'philly'}];
-  const epicIds=new Set(HEROES.filter(h=>h.g==='epic').map(h=>h.id));
-  const nonEpicPool=()=>HEROES.filter(h=>!epicIds.has(h.id)&&!rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
+
+
 
   // Joins 1-4 get their dedicated hero (if owned); joins 5-6 get next available
   const dedicatedS1=['jessie','jasser','seo_yoon','philly'];
