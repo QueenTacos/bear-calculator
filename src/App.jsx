@@ -313,17 +313,13 @@ function recommendAll(states,isRally,joinCount){
   // ── Rally Lead — first pick across the whole pool ───────────
   const rally={s1:null,s2:null,s3:null};
   if(isRally){
-    // Slot 1: approved infantry heroes only — empty if none available
-    rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
-    // Rally ALWAYS gets S2 and S3 regardless of S1 (rally troop distribution still happens)
-    // Slot 2: preferred lancer heroes first, then any non-capOnly hero
-    if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
-    else{
-      rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'reina'}]);
-      if(!rally.s2)rally.s2=pick(flexPool());
-    }
-    // Slot 3: preferred capacity heroes, then any remaining hero
-    rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
+    // Slot 1: approved infantry heroes — owned = eligible, no star requirement
+    rally.s1=pick([{id:'jeronimo'},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
+    // Slot 2: lancer heroes — owned = eligible, Mia always top pick if owned
+    rally.s2=pick([{id:'mia'},{id:'molly'},{id:'reina'},{id:'sonya'},{id:'renee'}]);
+    if(!rally.s2)rally.s2=pick(flexPool());
+    // Slot 3: capacity heroes best to good — owned = eligible
+    rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen'},{id:'lynn'},{id:'alonso'},{id:'bahiti'}]);
     if(!rally.s3)rally.s3=pick(anyPool());
   }
 
