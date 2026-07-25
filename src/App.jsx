@@ -90,6 +90,31 @@ const ADMIN_ID   = "yumqueentacos@gmail.com";
 const ALLIANCE   = "SYP";
 const ADMIN_NAME = "Queen Tacos";
 
+// ── IMAGE COMPRESSION (canvas-based, works in real browser) ─
+async function compressToBase64(file, maxPx=96, quality=0.75) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => {
+      // Fallback to FileReader if canvas fails
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    };
+    img.src = url;
+  });
+}
+
 // ── HERO DATA ─────────────────────────────────────────────────
 const GRP = {
   epic:{label:'Epic',bg:'#0a1f40',border:'#1e5a9a',accent:'#4a9adf'},
@@ -520,7 +545,7 @@ function Btn({children,onClick,color='#7c3aed',outline,small,full,disabled}){
 function HeroCard({hero,state,imgSrc,onToggle,onStars,onUpload}){
   const g=GRP[hero.g],owned=state?.owned??false,stars=state?.stars??0;
   const roleLabel={rally_s1:'⚔',rally_s2:'🏇',rally_s3:'🎯',join_s1:'🔵',join23:'🔵',slot3_cap:'📦'}[hero.role]??'';
-  const handleFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>onUpload(hero.id,ev.target.result);r.readAsDataURL(f);};
+  const handleFile=async e=>{const f=e.target.files[0];if(!f)return;const data=await compressToBase64(f);onUpload(hero.id,data);};
   return(
     <div style={{background:owned?g.bg:'#0a0615',border:`1.5px solid ${owned?g.border:'#1d0d30'}`,
       borderRadius:10,padding:'8px 6px',display:'flex',flexDirection:'column',alignItems:'center',
@@ -734,16 +759,20 @@ function LoginView({onLogin}){
 function PlayerApp({player,onLogout,onSwitchToAdmin}){
   const gid=player.gamerID;
   const [tab,setTab]=useState('heroes');
-  const [heroStates,setHS]=useState(player.heroStates||initHS());
+  // Safely merge saved data with fresh defaults so no field is ever undefined
+  const safePlayer = { ...{marchCap:'',joinCount:5,isRally:false,maxSend:false,
+    infantry:initTroops(),lancer:initTroops(),marksman:initTroops(),heroStates:initHS()}, ...player };
+  const [heroStates,setHS]=useState(()=>({...initHS(),...(safePlayer.heroStates||{})}));
   const [heroImages,setHI]=useState({});
-  const [marchCap,setMC]=useState(player.marchCap||'');
-  const [joinCount,setJC]=useState(player.joinCount||5);
-  const [isRally,setIR]=useState(player.isRally||false);
-  const [maxSend,setMS]=useState(player.maxSend||false);
-  const [infantry,setInf]=useState(player.infantry||initTroops());
-  const [lancer,setLan]=useState(player.lancer||initTroops());
-  const [marksman,setMark]=useState(player.marksman||initTroops());
+  const [marchCap,setMC]=useState(safePlayer.marchCap||'');
+  const [joinCount,setJC]=useState(safePlayer.joinCount||5);
+  const [isRally,setIR]=useState(Boolean(safePlayer.isRally));
+  const [maxSend,setMS]=useState(Boolean(safePlayer.maxSend));
+  const [infantry,setInf]=useState(()=>({...initTroops(),...(safePlayer.infantry||{})}));
+  const [lancer,setLan]=useState(()=>({...initTroops(),...(safePlayer.lancer||{})}));
+  const [marksman,setMark]=useState(()=>({...initTroops(),...(safePlayer.marksman||{})}));
   const [saving,setSaving]=useState(false);
+  const [saveErr,setSaveErr]=useState('');
   const [imgCount,setIC]=useState(0);
   const [joinRatio,setJoinRatio]=useState(player.joinRatio||'A');
   const [submitted,setSubmitted]=useState(false);
@@ -800,7 +829,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
             display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🐻</div>
           <div>
             <div style={{fontSize:14,fontWeight:900}}>{gid}</div>
-            <div style={{fontSize:9,color:'#7c5fa0'}}>{ALLIANCE} · {ownedCount}/65 heroes · {fmtPower(totalPower)} power · {saving?'saving…':'saved ✓'}</div>
+            <div style={{fontSize:9,color:saveErr?'#ef4444':'#7c5fa0'}}>{ALLIANCE} · {ownedCount}/65 heroes · {fmtPower(totalPower)} power · {saveErr||( saving?'saving…':'saved ✓')}</div>
           </div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -1045,13 +1074,24 @@ function AdminPanel({player,onLogout,onSwitchToPlayer}){
 
   useEffect(()=>{loadAll();},[loadAll]);
 
-  const scored=useMemo(()=>allPlayers.map(p=>({
-    ...p,
-    power:calcTroopPower(p.infantry||{},p.lancer||{},p.marksman||{}),
-    heroScore:calcHeroScore(p.heroStates),
-    cap:parseInt(p.marchCap)||0,
-    recs:recommend(p.heroStates||{},true),
-  })).sort((a,b)=>(b.power+b.heroScore*500)-(a.power+a.heroScore*500)),[allPlayers]);
+  const scored=useMemo(()=>allPlayers.map(p=>{
+    const hs={...initHS(),...(p.heroStates||{})};
+    const inf={...initTroops(),...(p.infantry||{})};
+    const lan={...initTroops(),...(p.lancer||{})};
+    const mark={...initTroops(),...(p.marksman||{})};
+    const power=calcTroopPower(inf,lan,mark);
+    const heroScore=calcHeroScore(hs);
+    const cap=parseInt(p.marchCap)||0;
+    // Calculate recs for both rally and join scenarios
+    const rallyRecs=recommendAll(hs,true,p.joinCount||5);
+    const joinRecs=recommendAll(hs,false,p.joinCount||5);
+    return{...p,power,heroScore,cap,
+      inf,lan,mark,hs,
+      recs:p.isRally?rallyRecs:joinRecs,
+      rallyRecs,joinRecs,
+      joinCount:p.joinCount||5,
+    };
+  }).sort((a,b)=>(b.power+b.heroScore*500)-(a.power+a.heroScore*500)),[allPlayers]);
 
   const optimization=useMemo(()=>{
     const lead=rallyLead?scored.find(p=>p.gamerID===rallyLead):null;
@@ -1154,10 +1194,13 @@ function AdminPanel({player,onLogout,onSwitchToPlayer}){
                   {isExpanded&&(
                     <div style={{padding:'0 16px 16px',borderTop:'1px solid #2d1a4a'}}>
                       <div style={{fontSize:10,color:'#9d78c0',marginTop:12,marginBottom:8,fontWeight:700,letterSpacing:'0.07em'}}>RECOMMENDED LOADOUT</div>
+                      <div style={{marginBottom:6,fontSize:9,color:'#7c5fa0'}}>
+                        {p.isRally?'🐻 Rally Lead':'🔵 Join Squad'} · {p.joinCount||5} joins
+                      </div>
                       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
-                        <MiniHero heroId={recs.rally.s1} heroStates={p.heroStates} heroImages={{}} label="⚔ SLOT 1"/>
-                        <MiniHero heroId={recs.rally.s2} heroStates={p.heroStates} heroImages={{}} label="🏇 SLOT 2"/>
-                        <MiniHero heroId={recs.rally.s3} heroStates={p.heroStates} heroImages={{}} label="🎯 SLOT 3"/>
+                        <MiniHero heroId={p.isRally?p.recs.rally.s1:p.recs.joins[0]?.s1} heroStates={p.hs} heroImages={{}} label="⚔ SLOT 1"/>
+                        <MiniHero heroId={p.isRally?p.recs.rally.s2:p.recs.joins[0]?.s2} heroStates={p.hs} heroImages={{}} label="🏇 SLOT 2"/>
+                        <MiniHero heroId={p.isRally?p.recs.rally.s3:p.recs.joins[0]?.s3} heroStates={p.hs} heroImages={{}} label="🎯 SLOT 3"/>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
                         {[{l:'Infantry Power',v:fmtPower(TIERS.reduce((s,t)=>s+ni(p.infantry?.[t.id])*t.mult,0)),c:'#c084fc'},
@@ -1253,7 +1296,7 @@ function AdminPanel({player,onLogout,onSwitchToPlayer}){
                       </div>
                     </div>
                     <div style={{display:'flex',gap:6,flexShrink:0}}>
-                      {[{id:recs.join.s1,l:'J1'},{id:recs.join.s2,l:'S2'},{id:recs.join.s3,l:'S3'}].map(({id,l})=>(
+                      {[{id:p.joinRecs.joins[0]?.s1,l:'J1'},{id:p.joinRecs.joins[0]?.s2,l:'S2'},{id:p.joinRecs.joins[0]?.s3,l:'S3'}].map(({id,l})=>(
                         <div key={l} style={{textAlign:'center'}}>
                           <div style={{fontSize:7,color:'#6d4a90',marginBottom:2}}>{l}</div>
                           {id?<div style={{width:28,height:28,borderRadius:5,
