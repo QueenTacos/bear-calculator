@@ -299,6 +299,11 @@ function recommendAll(states,isRally,joinCount){
   // Heroes that can NEVER go in slot 1 or 2
   const capOnly=new Set(HEROES.filter(h=>h.role==='slot3_cap').map(h=>h.id));
 
+  // Heroes reserved for rally roles — kept out of join pools when rally is active
+  const rallyReserved=new Set(
+    isRally ? HEROES.filter(h=>['rally_s1','rally_s2','rally_s3'].includes(h.role)).map(h=>h.id) : []
+  );
+
   const pick=(candidates)=>{
     for(const{id,minS=0}of candidates){
       if(o(id)&&s(id)>=minS&&!used.has(id)){used.add(id);return id;}
@@ -306,40 +311,45 @@ function recommendAll(states,isRally,joinCount){
     return null;
   };
 
-  // Dynamic pools — re-evaluated each call to respect current used set
-  const flexPool=()=>HEROES.filter(h=>!capOnly.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
-  const anyPool =()=>HEROES.filter(h=>o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
+  // Join pools exclude rally-reserved heroes so rally specialists stay in rally
+  const flexPool=()=>HEROES.filter(h=>
+    !capOnly.has(h.id)&&!rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)
+  ).map(h=>({id:h.id}));
+  const anyPool=()=>HEROES.filter(h=>
+    !rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)
+  ).map(h=>({id:h.id}));
+  const fullAnyPool=()=>HEROES.filter(h=>o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
 
-  // ── Rally Lead — first pick across the whole pool ───────────
+  // ── Rally Lead — gets first pick ────────────────────────────
   const rally={s1:null,s2:null,s3:null};
   if(isRally){
-    // Slot 1: approved infantry heroes — owned = eligible, no star requirement
-    rally.s1=pick([{id:'jeronimo'},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
-    // Slot 2: lancer heroes — owned = eligible, Mia always top pick if owned
-    rally.s2=pick([{id:'mia'},{id:'molly'},{id:'reina'},{id:'sonya'},{id:'renee'}]);
-    if(!rally.s2)rally.s2=pick(flexPool());
-    // Slot 3: capacity heroes best to good — owned = eligible
-    rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen'},{id:'lynn'},{id:'alonso'},{id:'bahiti'}]);
-    if(!rally.s3)rally.s3=pick(anyPool());
+    // Slot 1: Jeronimo best if 3+ stars, then Hector > Magnus > Gregory
+    rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
+    if(rally.s1){
+      // Slot 2: Mia maxed (5★) always best, then Molly > Mia(3+★) > Reina(4+★) > Sonya > Renee
+      if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
+      else{
+        rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'renee'},{id:'reina'}]);
+        if(!rally.s2)rally.s2=pick(HEROES.filter(h=>!capOnly.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id})));
+      }
+      // Slot 3: Ligeia→Rufus→...→Bahiti best to good
+      rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
+      if(!rally.s3)rally.s3=pick(fullAnyPool());
+    }
   }
 
-  // ── Join Squads — strict slot 1, open slots 2 & 3 ──────────
+  // ── Join Squads — slot 1 strictly approved, slots 2-3 open ──
   const joinS1Approved=[{id:'jessie'},{id:'jasser'},{id:'seo_yoon'},{id:'philly'}];
-
-  // Epic/cap-only IDs — avoid in joins 1-3 (only use in joins 4-6)
-  const epicIds=new Set(HEROES.filter(h=>GRP[h.g]&&h.g==='epic').map(h=>h.id));
-  // Pool for slot 3 of joins 1-3: exclude epics (save them for later joins)
-  const nonEpicAnyPool=()=>HEROES.filter(h=>!epicIds.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
+  const epicIds=new Set(HEROES.filter(h=>h.g==='epic').map(h=>h.id));
+  const nonEpicPool=()=>HEROES.filter(h=>!epicIds.has(h.id)&&!rallyReserved.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}));
 
   const joins=[];
   for(let i=0;i<joinCount;i++){
-    // Slot 1: approved join heroes only — empty if pool exhausted
     const s1=pick(joinS1Approved);
-    // If slot 1 is empty, no heroes for this squad at all
+    // No slot 1 = no heroes at all
     const s2=s1?pick(flexPool()):null;
-    // Joins 1-3: avoid epic heroes in slot 3 if possible; joins 4-6: open pool
-    const s3pool=s1?(i<3?nonEpicAnyPool():anyPool()):null;
-    const s3=s3pool?pick(s3pool):null;
+    // Joins 1-3 avoid epics; joins 4-6 open
+    const s3=s1?(i<3?pick(nonEpicPool()):pick(anyPool())):null;
     joins.push({s1,s2,s3});
   }
 
@@ -353,99 +363,69 @@ function recommend(states,isRally){
 }
 
 
-// ── SQUAD DISTRIBUTION CALCULATOR (OPTIMIZED) ───────────────
-// Rules:
-//   Rally:  5% inf / 5% lan / 90% mark (target)
-//   Join A: 10% inf / 10% lan / 80% mark (target)
-//   Join B: 20% inf / 20% lan / 60% mark (target)
-// Optimizations:
-//   1. Maximize march capacity — fill remaining cap with inf then lan
-//   2. If joins are short on marksmen, pull from rally marksmen pool
-//   3. Never exceed total available troops or march capacity
-function calcDistribution(inf,lan,mark,marchCap,isRally,joinCount,joinRatioKey){
+// ── SQUAD DISTRIBUTION CALCULATOR ───────────────────────────
+// Custom ratios, rally gets troops first, fill remaining cap with lancers then infantry
+// Marksmen give most points so they are always prioritized by ratio
+function calcDistribution(inf,lan,mark,marchCap,isRally,joinCount,rallyRatio,joinRatio){
   const tI=TIERS.reduce((s,t)=>s+ni(inf[t.id]),0);
   const tL=TIERS.reduce((s,t)=>s+ni(lan[t.id]),0);
   const tM=TIERS.reduce((s,t)=>s+ni(mark[t.id]),0);
   const cap=ni(marchCap);
+  const totalAvail=tI+tL+tM;
   const totalSquads=(isRally?1:0)+joinCount;
-  if(totalSquads===0)return{rally:null,joins:[],tI,tL,tM,cap,totalUsed:0,totalAvail:tI+tL+tM,efficiency:0};
+  if(totalSquads===0)return{rally:null,joins:[],tI,tL,tM,cap,totalUsed:0,totalAvail,efficiency:0};
 
-  const JR=joinRatioKey==='B'?{i:0.20,l:0.20,m:0.60}:{i:0.10,l:0.10,m:0.80};
+  // Parse ratios (0–100 → 0.0–1.0), clamp to available
+  const rR={
+    m:Math.max(0,Math.min(1,(ni(rallyRatio?.mark)||90)/100)),
+    l:Math.max(0,Math.min(1,(ni(rallyRatio?.lan)||5)/100)),
+    i:Math.max(0,Math.min(1,(ni(rallyRatio?.inf)||5)/100)),
+  };
+  const jR={
+    m:Math.max(0,Math.min(1,(ni(joinRatio?.mark)||80)/100)),
+    l:Math.max(0,Math.min(1,(ni(joinRatio?.lan)||10)/100)),
+    i:Math.max(0,Math.min(1,(ni(joinRatio?.inf)||10)/100)),
+  };
 
-  // Helper: fill a squad to cap using given ratio, then top up with inf/lan
-  function fillSquad(avI,avL,avM,ratio,squadCap){
-    // Target amounts from ratio
-    let tgt=squadCap>0?Math.min(squadCap,avI+avL+avM):avI+avL+avM;
-    let sI=Math.min(Math.floor(tgt*ratio.i),avI);
-    let sL=Math.min(Math.floor(tgt*ratio.l),avL);
-    let sM=Math.min(Math.floor(tgt*ratio.m),avM);
-    let used_total=sI+sL+sM;
-    // Fill remaining capacity with inf first, then lan
-    if(squadCap>0&&used_total<squadCap){
-      const remCap=squadCap-used_total;
-      const addI=Math.min(remCap,avI-sI);
-      sI+=addI; used_total+=addI;
-    }
-    if(squadCap>0&&used_total<squadCap){
-      const remCap=squadCap-used_total;
-      const addL=Math.min(remCap,avL-sL);
-      sL+=addL; used_total+=addL;
-    }
-    // If still under cap add remaining marksmen
-    if(squadCap>0&&used_total<squadCap){
-      const remCap=squadCap-used_total;
-      const addM=Math.min(remCap,avM-sM);
-      sM+=addM; used_total+=addM;
-    }
-    const total=sI+sL+sM;
-    return{inf:sI,lan:sL,mark:sM,total,fillPct:squadCap>0?Math.round(total/squadCap*100):0};
+  // Fill one squad: apply ratio then fill remaining cap with lancers then infantry
+  function fillSquad(avI,avL,avM,r,squadCap){
+    const limit=Math.min(avI+avL+avM, squadCap>0?squadCap:Infinity);
+    let sM=Math.min(Math.floor(limit*r.m),avM);
+    let sL=Math.min(Math.floor(limit*r.l),avL);
+    let sI=Math.min(Math.floor(limit*r.i),avI);
+    let tot=sM+sL+sI;
+    // Fill remaining cap: lancers first (more points than inf), then infantry
+    if(squadCap>0&&tot<squadCap){const add=Math.min(squadCap-tot,avL-sL);sL+=add;tot+=add;}
+    if(squadCap>0&&tot<squadCap){const add=Math.min(squadCap-tot,avI-sI);sI+=add;tot+=add;}
+    // Edge case: if ratio alone didn't fill, top up marksmen too
+    if(squadCap>0&&tot<squadCap){const add=Math.min(squadCap-tot,avM-sM);sM+=add;tot+=add;}
+    return{inf:sI,lan:sL,mark:sM,total:tot,
+      fillPct:squadCap>0?Math.round(tot/squadCap*100):0};
   }
 
-  // ── Step 1: Calculate what joins need for marksmen ────────────
-  // Evenly split available troops across joins (reserve rally share first)
-  const rallyMarkReserve=isRally&&cap>0?Math.min(Math.floor(tM*0.90),Math.floor(cap*0.90)):0;
-  const joinMarkAvail=tM-rallyMarkReserve;
-  const markPerJoin=joinCount>0?Math.floor(joinMarkAvail/joinCount):0;
-
-  // Check if joins can fill their marksmen target
-  const joinMarkTarget=cap>0?Math.floor(cap*JR.m):markPerJoin;
-  const joinsNeedMore=joinCount>0&&markPerJoin<joinMarkTarget;
-
-  // If joins are short on marksmen, reduce rally's marksmen to give joins more
-  let rallyMarkBudget=rallyMarkReserve;
-  if(isRally&&joinsNeedMore){
-    const joinDeficit=(joinMarkTarget-markPerJoin)*joinCount;
-    const transfer=Math.min(joinDeficit,Math.floor(rallyMarkReserve*0.40)); // give up to 40% of rally mark
-    rallyMarkBudget=rallyMarkReserve-transfer;
-  }
-
-  // ── Step 2: Assign rally ──────────────────────────────────────
-  // Use cap if set; otherwise use fair share of available troops as the squad size
-  const effectiveCap = cap > 0 ? cap : Math.floor((tI+tL+tM) / totalSquads);
+  // ── Rally gets troops first ──────────────────────────────────
   let remI=tI,remL=tL,remM=tM,rallyOut=null;
-  if(isRally){
-    rallyOut=fillSquad(remI,remL,Math.min(remM,rallyMarkBudget),{i:0.05,l:0.05,m:0.90},effectiveCap);
+  if(isRally&&cap>0){
+    rallyOut=fillSquad(remI,remL,remM,rR,cap);
     remI-=rallyOut.inf; remL-=rallyOut.lan; remM-=rallyOut.mark;
   }
 
-  // ── Step 3: Split remaining evenly across joins ───────────────
+  // ── Remainder split evenly across join squads ────────────────
   const joins=[];
   if(joinCount>0){
     const pI=Math.floor(remI/joinCount);
     const pL=Math.floor(remL/joinCount);
     const pM=Math.floor(remM/joinCount);
     for(let i=0;i<joinCount;i++){
-      // Last join gets any leftover from rounding
-      const isLast=i===joinCount-1;
-      const avI=isLast?remI-(pI*(joinCount-1)):pI;
-      const avL=isLast?remL-(pL*(joinCount-1)):pL;
-      const avM=isLast?remM-(pM*(joinCount-1)):pM;
-      joins.push(fillSquad(avI,avL,avM,JR,cap>0?cap:avI+avL+avM));
+      const last=i===joinCount-1;
+      const avI=last?remI-pI*(joinCount-1):pI;
+      const avL=last?remL-pL*(joinCount-1):pL;
+      const avM=last?remM-pM*(joinCount-1):pM;
+      joins.push(fillSquad(avI,avL,avM,jR,cap>0?cap:avI+avL+avM));
     }
   }
 
   const totalUsed=(rallyOut?.total||0)+joins.reduce((s,j)=>s+j.total,0);
-  const totalAvail=tI+tL+tM;
   return{rally:rallyOut,joins,tI,tL,tM,cap,totalUsed,totalAvail,
     efficiency:totalAvail>0?Math.round(totalUsed/totalAvail*100):0};
 }
@@ -792,7 +772,8 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
   const [saving,setSaving]=useState(false);
   const [saveErr,setSaveErr]=useState('');
   const [imgCount,setIC]=useState(0);
-  const [joinRatio,setJoinRatio]=useState(player.joinRatio||'A');
+  const [rallyRatio,setRallyRatio]=useState(player.rallyRatio||{inf:5,lan:5,mark:90});
+  const [joinRatio,setJoinRatio]=useState(player.joinRatio||{inf:10,lan:10,mark:80});
   const [submitted,setSubmitted]=useState(false);
 
   // Load all hero images from Supabase (shared across all players)
@@ -808,12 +789,12 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
     setSaving(true);
     const t=setTimeout(async()=>{
       const pd={...player,heroStates,marchCap,joinCount,isRally,maxSend,
-        infantry,lancer,marksman,joinRatio,updatedAt:Date.now()};
+        infantry,lancer,marksman,rallyRatio,joinRatio,updatedAt:Date.now()};
       await stor.setPlayer(gid,pd);
       setSaving(false);
     },1000);
     return()=>clearTimeout(t);
-  },[heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,joinRatio]);
+  },[heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,rallyRatio,joinRatio]);
 
   const toggleOwned=useCallback(id=>setHS(p=>({...p,[id]:{...p[id],owned:!p[id].owned}})),[]);
   const setStars=useCallback((id,s)=>setHS(p=>({...p,[id]:{...p[id],stars:s}})),[]);
@@ -971,25 +952,46 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
                 </div>
               </div>
 
-              {/* Join Squad Ratio Picker */}
-              <div style={{marginTop:14}}>
-                <div style={{fontSize:10,color:'#9d78c0',letterSpacing:'0.07em',fontWeight:700,marginBottom:8}}>JOIN SQUAD TROOP RATIO</div>
-                <div style={{display:'flex',gap:8}}>
-                  {[
-                    {k:'A',label:'Balanced',desc:'10% Inf · 10% Lan · 80% Mark'},
-                    {k:'B',label:'Heavy Mix',desc:'20% Inf · 20% Lan · 60% Mark'},
-                  ].map(({k,label,desc})=>(
-                    <div key={k} onClick={()=>setJoinRatio(k)} style={{
-                      flex:1,padding:'10px 12px',cursor:'pointer',userSelect:'none',
-                      background:joinRatio===k?'#1a0b35':'#0a0615',
-                      border:`1.5px solid ${joinRatio===k?'#a855f7':'#2d1a4a'}`,
-                      borderRadius:10,transition:'all .2s'}}>
-                      <div style={{fontSize:12,fontWeight:800,color:joinRatio===k?'#e879f9':'#6d4a90',marginBottom:2}}>{label}</div>
-                      <div style={{fontSize:9,color:joinRatio===k?'#9d78c0':'#3d2060'}}>{desc}</div>
+              {/* Custom Ratio Inputs */}
+              {[
+                {label:'RALLY LEAD RATIO',ratio:rallyRatio,setR:setRallyRatio,accent:'#f59e0b',show:isRally},
+                {label:'JOIN SQUADS RATIO',ratio:joinRatio,setR:setJoinRatio,accent:'#a855f7',show:true},
+              ].filter(r=>r.show).map(({label,ratio,setR,accent})=>{
+                const rSum=ni(ratio.mark)+ni(ratio.lan)+ni(ratio.inf);
+                const valid=rSum===100;
+                return(
+                  <div key={label} style={{marginTop:14}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                      <div style={{fontSize:10,color:'#9d78c0',letterSpacing:'0.07em',fontWeight:700}}>{label}</div>
+                      <div style={{fontSize:10,fontWeight:700,color:valid?'#34d399':'#ef4444'}}>
+                        {rSum}% {valid?'✓':`— needs ${100-rSum}% more`}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                      {[
+                        {k:'mark',label:'Marksmen',c:'#fb923c'},
+                        {k:'lan', label:'Lancers', c:'#e879f9'},
+                        {k:'inf', label:'Infantry',c:'#c084fc'},
+                      ].map(({k,label:fl,c})=>(
+                        <div key={k}>
+                          <div style={{fontSize:9,color:c,fontWeight:700,marginBottom:4}}>{fl} %</div>
+                          <div style={{display:'flex',alignItems:'center',gap:3}}>
+                            <input type="number" min="0" max="100"
+                              value={ratio[k]??''}
+                              onChange={e=>setR(p=>({...p,[k]:e.target.value}))}
+                              style={{width:'100%',background:'#0a0615',
+                                border:`1.5px solid ${valid?c+'55':'#ef444455'}`,
+                                borderRadius:7,color:c,fontSize:16,fontWeight:800,
+                                padding:'8px 8px',outline:'none',fontFamily:'inherit',
+                                textAlign:'center'}}/>
+                            <span style={{fontSize:11,color:'#6d4a90',flexShrink:0}}>%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* SUBMIT BUTTON */}
@@ -1006,7 +1008,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
 
         {/* RESULTS TAB */}
         {tab==='results'&&(()=>{
-          const dist=calcDistribution(infantry,lancer,marksman,marchCap,isRally,joinCount,joinRatio);
+          const dist=calcDistribution(infantry,lancer,marksman,marchCap,isRally,joinCount,rallyRatio,joinRatio);
           const hasData=dist.totalAvail>0||ni(marchCap)>0||isRally||joinCount>0;
           return(
             <div>
@@ -1043,7 +1045,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
 
                   {/* Ratio note */}
                   <div style={{fontSize:10,color:'#6d4a90',textAlign:'center',marginBottom:14}}>
-                    Rally: 5/5/90 · Joins ({joinRatio==='B'?'20/20/60':'10/10/80'}) · Troops split evenly across all squads
+                    Rally: {ni(rallyRatio?.mark)||90}% mark / {ni(rallyRatio?.lan)||5}% lan / {ni(rallyRatio?.inf)||5}% inf · Joins: {ni(joinRatio?.mark)||80}% mark / {ni(joinRatio?.lan)||10}% lan / {ni(joinRatio?.inf)||10}% inf
                   </div>
 
                   {/* Rally card */}
