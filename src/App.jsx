@@ -1,85 +1,109 @@
 import { createClient } from '@supabase/supabase-js'
 
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+// ── Supabase client (may be null if env vars not set) ────────
+const _sbUrl = import.meta.env.VITE_SUPABASE_URL
+const _sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const supabase = (_sbUrl && _sbKey) ? createClient(_sbUrl, _sbKey) : null
 
-// ── Storage helpers — drop-in replacement for window.storage ──
+// ── localStorage helpers (always available, instant) ─────────
+const LS = {
+  get(key) { try { const v=localStorage.getItem(key); return v?JSON.parse(v):null; } catch { return null; } },
+  set(key,val) { try { localStorage.setItem(key,JSON.stringify(val)); } catch {} },
+  remove(key) { try { localStorage.removeItem(key); } catch {} },
+  keys() { try { return Object.keys(localStorage); } catch { return []; } },
+}
 
+// ── Hybrid storage: localStorage first, Supabase in background ─
 export const stor = {
-  // Get a player profile
+  // ── Players ──────────────────────────────────────────────────
   async getPlayer(gamerID) {
-    const { data, error } = await supabase
-      .from('players')
-      .select('*')
-      .eq('gamer_id', gamerID.toLowerCase())
-      .single()
-    if (error) return null
-    return data?.profile_data ?? null
+    const key = `syp_player_${gamerID.toLowerCase()}`
+    // Try Supabase first for freshest data
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('players').select('*')
+          .eq('gamer_id', gamerID.toLowerCase()).single()
+        if (!error && data?.profile_data) {
+          LS.set(key, data.profile_data) // cache locally
+          return data.profile_data
+        }
+      } catch {}
+    }
+    // Fall back to localStorage
+    return LS.get(key)
   },
 
-  // Save/upsert a player profile
   async setPlayer(gamerID, profileData) {
-    const { error } = await supabase
-      .from('players')
-      .upsert({
-        gamer_id: gamerID.toLowerCase(),
-        profile_data: profileData,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'gamer_id' })
-    if (error) console.error('setPlayer error:', error)
+    const key = `syp_player_${gamerID.toLowerCase()}`
+    // Always save locally first (instant, reliable)
+    LS.set(key, profileData)
+    // Sync to Supabase in background
+    if (supabase) {
+      try {
+        await supabase.from('players').upsert({
+          gamer_id: gamerID.toLowerCase(),
+          profile_data: profileData,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'gamer_id' })
+      } catch(e) { console.warn('Supabase sync failed (data saved locally):', e) }
+    }
   },
 
-  // Get all player IDs
-  async getPlayerIndex() {
-    const { data, error } = await supabase
-      .from('players')
-      .select('gamer_id')
-    if (error) return []
-    return data.map(r => r.gamer_id)
-  },
-
-  // Get all player profiles (for admin)
   async getAllPlayers() {
-    const { data, error } = await supabase
-      .from('players')
-      .select('gamer_id, profile_data, updated_at')
-      .order('updated_at', { ascending: false })
-    if (error) return []
-    return data.map(r => r.profile_data).filter(Boolean)
+    // Try Supabase for cross-device data
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('players').select('gamer_id, profile_data, updated_at')
+          .order('updated_at', { ascending: false })
+        if (!error && data?.length) {
+          // Also cache each player locally
+          data.forEach(r => r.profile_data &&
+            LS.set(`syp_player_${r.gamer_id}`, r.profile_data))
+          return data.map(r => r.profile_data).filter(Boolean)
+        }
+      } catch {}
+    }
+    // Fall back: gather all locally cached players
+    return LS.keys()
+      .filter(k => k.startsWith('syp_player_'))
+      .map(k => LS.get(k)).filter(Boolean)
   },
 
-  // Get a hero image (shared across all players)
-  async getHeroImage(heroId) {
-    const { data, error } = await supabase
-      .from('hero_images')
-      .select('image_data')
-      .eq('hero_id', heroId)
-      .single()
-    if (error) return null
-    return data?.image_data ?? null
-  },
-
-  // Save a hero image (shared)
-  async setHeroImage(heroId, imageData) {
-    const { error } = await supabase
-      .from('hero_images')
-      .upsert({
-        hero_id: heroId,
-        image_data: imageData,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'hero_id' })
-    if (error) console.error('setHeroImage error:', error)
-  },
-
-  // Load all hero images at once (batch)
+  // ── Hero images ───────────────────────────────────────────────
   async getAllHeroImages() {
-    const { data, error } = await supabase
-      .from('hero_images')
-      .select('hero_id, image_data')
-    if (error) return {}
-    return Object.fromEntries(data.map(r => [r.hero_id, r.image_data]))
+    // Try Supabase
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('hero_images').select('hero_id, image_data')
+        if (!error && data?.length) {
+          const imgs = Object.fromEntries(data.map(r => [r.hero_id, r.image_data]))
+          LS.set('syp_hero_images', imgs) // cache
+          return imgs
+        }
+      } catch {}
+    }
+    // Fall back to localStorage cache
+    return LS.get('syp_hero_images') || {}
+  },
+
+  async setHeroImage(heroId, imageData) {
+    // Save to local cache immediately
+    const cache = LS.get('syp_hero_images') || {}
+    cache[heroId] = imageData
+    LS.set('syp_hero_images', cache)
+    // Sync to Supabase
+    if (supabase) {
+      try {
+        await supabase.from('hero_images').upsert({
+          hero_id: heroId,
+          image_data: imageData,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'hero_id' })
+      } catch(e) { console.warn('Hero image Supabase sync failed:', e) }
+    }
   },
 }
 
