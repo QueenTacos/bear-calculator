@@ -315,18 +315,16 @@ function recommendAll(states,isRally,joinCount){
   if(isRally){
     // Slot 1: approved infantry heroes only — empty if none available
     rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
-    // If slot 1 is empty, no heroes at all for this squad
-    if(rally.s1){
-      // Slot 2: preferred lancer heroes first, then any non-capOnly hero
-      if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
-      else{
-        rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'reina'}]);
-        if(!rally.s2)rally.s2=pick(flexPool());
-      }
-      // Slot 3: preferred capacity heroes, then any remaining hero
-      rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
-      if(!rally.s3)rally.s3=pick(anyPool());
+    // Rally ALWAYS gets S2 and S3 regardless of S1 (rally troop distribution still happens)
+    // Slot 2: preferred lancer heroes first, then any non-capOnly hero
+    if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
+    else{
+      rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'reina'}]);
+      if(!rally.s2)rally.s2=pick(flexPool());
     }
+    // Slot 3: preferred capacity heroes, then any remaining hero
+    rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
+    if(!rally.s3)rally.s3=pick(anyPool());
   }
 
   // ── Join Squads — strict slot 1, open slots 2 & 3 ──────────
@@ -426,11 +424,11 @@ function calcDistribution(inf,lan,mark,marchCap,isRally,joinCount,joinRatioKey){
   }
 
   // ── Step 2: Assign rally ──────────────────────────────────────
+  // Use cap if set; otherwise use fair share of available troops as the squad size
+  const effectiveCap = cap > 0 ? cap : Math.floor((tI+tL+tM) / totalSquads);
   let remI=tI,remL=tL,remM=tM,rallyOut=null;
-  if(isRally&&cap>0){
-    const rRatio={i:0.05,l:0.05,m:rallyMarkBudget/(cap||1)};
-    // Clamp ratio so it doesn't exceed available
-    rallyOut=fillSquad(remI,remL,Math.min(remM,rallyMarkBudget),{i:0.05,l:0.05,m:0.90},cap);
+  if(isRally){
+    rallyOut=fillSquad(remI,remL,Math.min(remM,rallyMarkBudget),{i:0.05,l:0.05,m:0.90},effectiveCap);
     remI-=rallyOut.inf; remL-=rallyOut.lan; remM-=rallyOut.mark;
   }
 
@@ -458,8 +456,8 @@ function calcDistribution(inf,lan,mark,marchCap,isRally,joinCount,joinRatioKey){
 
 // ── SQUAD RESULT CARD ─────────────────────────────────────────
 function SquadCard({isRally,num,slotHeroes,dist,heroStates,heroImages}){
-  if(!dist)return null;
   const ac=isRally?'#f59e0b':'#7c3aed';
+  // Show card even without troop dist — heroes still meaningful
   const typePct=v=>dist.total>0?Math.round(v/dist.total*100):0;
   return(
     <div style={{background:isRally?'linear-gradient(145deg,#1e1200,#120c00)':'linear-gradient(145deg,#13092a,#0f0620)',
@@ -819,7 +817,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
       setSaving(false);
     },1000);
     return()=>clearTimeout(t);
-  },[heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman]);
+  },[heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,joinRatio]);
 
   const toggleOwned=useCallback(id=>setHS(p=>({...p,[id]:{...p[id],owned:!p[id].owned}})),[]);
   const setStars=useCallback((id,s)=>setHS(p=>({...p,[id]:{...p[id],stars:s}})),[]);
@@ -1013,7 +1011,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
         {/* RESULTS TAB */}
         {tab==='results'&&(()=>{
           const dist=calcDistribution(infantry,lancer,marksman,marchCap,isRally,joinCount,joinRatio);
-          const hasData=dist.totalAvail>0||ni(marchCap)>0;
+          const hasData=dist.totalAvail>0||ni(marchCap)>0||isRally||joinCount>0;
           return(
             <div>
               {!submitted&&!hasData&&(
