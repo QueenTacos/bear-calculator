@@ -168,71 +168,71 @@ const GRP = {
   s17:{label:'S17',bg:'#150a35',border:'#5a2aaa',accent:'#9a5aff'},
 };
 const HEROES=[
-  {id:'smith',name:'Smith',g:'epic',role:'slot3_cap'},
-  {id:'eugene',name:'Eugene',g:'epic',role:'slot3_cap'},
-  {id:'charlie',name:'Charlie',g:'epic',role:'slot3_cap'},
-  {id:'cloris',name:'Cloris',g:'epic',role:'slot3_cap'},
-  {id:'sergey',name:'Sergey',g:'rare',role:'join23'},
-  {id:'jessie',name:'Jessie',g:'rare',role:'join_s1',jp:1},
-  {id:'patrick',name:'Patrick',g:'rare',role:'slot3_cap'},
-  {id:'lumak',name:'Lumak Bokan',g:'rare',role:'join23'},
-  {id:'ling_xue',name:'Ling Xue',g:'rare',role:'slot3_cap'},
-  {id:'gina',name:'Gina',g:'rare',role:'slot3_cap'},
-  {id:'bahiti',name:'Bahiti',g:'rare',role:'rally_s3',r3p:1},
-  {id:'jasser',name:'Jasser',g:'rare',role:'join_s1',jp:2},
-  {id:'seo_yoon',name:'Seo-yoon',g:'rare',role:'join_s1',jp:3},
-  {id:'natalia',name:'Natalia',g:'s1',role:'slot3_cap'},
-  {id:'jeronimo',name:'Jeronimo',g:'s1',role:'rally_s1',r1p:1,minS:3},
-  {id:'molly',name:'Molly',g:'s1',role:'rally_s2',r2p:1},
-  {id:'zinman',name:'Zinman',g:'s1',role:'slot3_cap'},
-  {id:'flint',name:'Flint',g:'s2',role:'rally_s1',r1p:2},
-  {id:'philly',name:'Philly',g:'s2',role:'join_s1',jp:4},
-  {id:'alonso',name:'Alonso',g:'s2',role:'rally_s3',r3p:2},
-  {id:'logan',name:'Logan',g:'s3',role:'join23'},
+  {id:'smith',name:'Smith',g:'epic',role:'slot3_cap',t:'i'},
+  {id:'eugene',name:'Eugene',g:'epic',role:'slot3_cap',t:'i'},
+  {id:'charlie',name:'Charlie',g:'epic',role:'slot3_cap',t:'l'},
+  {id:'cloris',name:'Cloris',g:'epic',role:'slot3_cap',t:'m'},
+  {id:'sergey',name:'Sergey',g:'rare',role:'join23',t:'i'},
+  {id:'jessie',name:'Jessie',g:'rare',role:'join_s1',jp:1,t:'l'},
+  {id:'patrick',name:'Patrick',g:'rare',role:'slot3_cap',t:'l'},
+  {id:'lumak',name:'Lumak Bokan',g:'rare',role:'join23',t:'l'},
+  {id:'ling_xue',name:'Ling Xue',g:'rare',role:'slot3_cap',t:'l'},
+  {id:'gina',name:'Gina',g:'rare',role:'slot3_cap',t:'m'},
+  {id:'bahiti',name:'Bahiti',g:'rare',role:'rally_s3',r3p:1,t:'m'},
+  {id:'jasser',name:'Jasser',g:'rare',role:'join_s1',jp:2,t:'m'},
+  {id:'seo_yoon',name:'Seo-yoon',g:'rare',role:'join_s1',jp:3,t:'m'},
+  {id:'natalia',name:'Natalia',g:'s1',role:'slot3_cap',t:'l'},
+  {id:'jeronimo',name:'Jeronimo',g:'s1',role:'rally_s1',r1p:1,minS:3,t:'i'},
+  {id:'molly',name:'Molly',g:'s1',role:'rally_s2',r2p:1,t:'l'},
+  {id:'zinman',name:'Zinman',g:'s1',role:'slot3_cap',t:'m'},
+  {id:'flint',name:'Flint',g:'s2',role:'rally_s1',r1p:2,t:'i'},
+  {id:'philly',name:'Philly',g:'s2',role:'join_s1',jp:4,t:'l'},
+  {id:'alonso',name:'Alonso',g:'s2',role:'rally_s3',r3p:2,t:'m'},
+  {id:'logan',name:'Logan',g:'s3',role:'join23',t:'i'},
   {id:'mia',name:'Mia',g:'s3',role:'rally_s2',r2p:2,minS:3,maxedBest:true},
-  {id:'greg_s3',name:'Greg',g:'s3',role:'join23'},
-  {id:'ahmose',name:'Ahmose',g:'s4',role:'join23'},
-  {id:'reina',name:'Reina',g:'s4',role:'rally_s2',r2p:3,minS:4},
-  {id:'lynn',name:'Lynn',g:'s4',role:'rally_s3',r3p:3,minS:4},
-  {id:'hector',name:'Hector',g:'s5',role:'rally_s1',r1p:3},
-  {id:'norah',name:'Norah',g:'s5',role:'join23'},
-  {id:'gwen',name:'Gwen',g:'s5',role:'rally_s3',r3p:4,minS:3},
-  {id:'wu_ming',name:'Wu Ming',g:'s6',role:'join23'},
-  {id:'renee',name:'Renee',g:'s6',role:'rally_s2',r2p:4},
-  {id:'wayne',name:'Wayne',g:'s6',role:'rally_s3',r3p:5},
-  {id:'edith',name:'Edith',g:'s7',role:'join23'},
-  {id:'gordon',name:'Gordon',g:'s7',role:'join23'},
-  {id:'bradley',name:'Bradley',g:'s7',role:'rally_s3',r3p:6},
-  {id:'gatot',name:'Gatot',g:'s8',role:'join23'},
-  {id:'sonya',name:'Sonya',g:'s8',role:'rally_s2',r2p:5},
-  {id:'hendrik',name:'Hendrik',g:'s8',role:'join23'},
-  {id:'magnus',name:'Magnus',g:'s9',role:'rally_s1',r1p:4},
-  {id:'fred',name:'Fred',g:'s9',role:'join23'},
-  {id:'xura',name:'Xura',g:'s9',role:'join23'},
-  {id:'gregory',name:'Gregory',g:'s10',role:'rally_s1',r1p:5},
-  {id:'freya',name:'Freya',g:'s10',role:'join23'},
-  {id:'blanchette',name:'Blanchette',g:'s10',role:'rally_s3',r3p:7},
-  {id:'eleonora',name:'Eleonora',g:'s11',role:'join23'},
-  {id:'lloyd',name:'Lloyd',g:'s11',role:'join23'},
-  {id:'rufus',name:'Rufus',g:'s11',role:'rally_s3',r3p:8},
-  {id:'hervor',name:'Hervor',g:'s12',role:'join23'},
-  {id:'karol',name:'Karol',g:'s12',role:'join23'},
-  {id:'ligeia',name:'Ligeia',g:'s12',role:'rally_s3',r3p:9},
-  {id:'gisela',name:'Gisela',g:'s13',role:'join23'},
-  {id:'flora',name:'Flora',g:'s13',role:'join23'},
-  {id:'vulcanus',name:'Vulcanus',g:'s13',role:'join23'},
-  {id:'elif',name:'Elif',g:'s14',role:'join23'},
-  {id:'dominic',name:'Dominic',g:'s14',role:'join23'},
-  {id:'cara',name:'Cara',g:'s14',role:'join23'},
-  {id:'hank',name:'Hank',g:'s15',role:'join23'},
-  {id:'estrella',name:'Estrella',g:'s15',role:'join23'},
-  {id:'viveca',name:'Viveca',g:'s15',role:'join23'},
-  {id:'seigel',name:'Seigel',g:'s16',role:'join23'},
-  {id:'ursar',name:'Ursar',g:'s16',role:'join23'},
-  {id:'aisling',name:'Aisling',g:'s16',role:'join23'},
-  {id:'aiden',name:'Aiden',g:'s17',role:'join23'},
-  {id:'bertha',name:'Bertha',g:'s17',role:'join23'},
-  {id:'eleanor',name:'Eleanor',g:'s17',role:'join23'},
+  {id:'greg_s3',name:'Greg',g:'s3',role:'join23',t:'m'},
+  {id:'ahmose',name:'Ahmose',g:'s4',role:'join23',t:'i'},
+  {id:'reina',name:'Reina',g:'s4',role:'rally_s2',r2p:3,minS:4,t:'l'},
+  {id:'lynn',name:'Lynn',g:'s4',role:'rally_s3',r3p:3,minS:4,t:'m'},
+  {id:'hector',name:'Hector',g:'s5',role:'rally_s1',r1p:3,t:'i'},
+  {id:'norah',name:'Norah',g:'s5',role:'join23',t:'l'},
+  {id:'gwen',name:'Gwen',g:'s5',role:'rally_s3',r3p:4,minS:3,t:'m'},
+  {id:'wu_ming',name:'Wu Ming',g:'s6',role:'join23',t:'i'},
+  {id:'renee',name:'Renee',g:'s6',role:'rally_s2',r2p:4,t:'l'},
+  {id:'wayne',name:'Wayne',g:'s6',role:'rally_s3',r3p:5,t:'m'},
+  {id:'edith',name:'Edith',g:'s7',role:'join23',t:'i'},
+  {id:'gordon',name:'Gordon',g:'s7',role:'join23',t:'l'},
+  {id:'bradley',name:'Bradley',g:'s7',role:'rally_s3',r3p:6,t:'m'},
+  {id:'gatot',name:'Gatot',g:'s8',role:'join23',t:'i'},
+  {id:'sonya',name:'Sonya',g:'s8',role:'rally_s2',r2p:5,t:'l'},
+  {id:'hendrik',name:'Hendrik',g:'s8',role:'join23',t:'m'},
+  {id:'magnus',name:'Magnus',g:'s9',role:'rally_s1',r1p:4,t:'i'},
+  {id:'fred',name:'Fred',g:'s9',role:'join23',t:'l'},
+  {id:'xura',name:'Xura',g:'s9',role:'join23',t:'m'},
+  {id:'gregory',name:'Gregory',g:'s10',role:'rally_s1',r1p:5,t:'i'},
+  {id:'freya',name:'Freya',g:'s10',role:'join23',t:'l'},
+  {id:'blanchette',name:'Blanchette',g:'s10',role:'rally_s3',r3p:7,t:'m'},
+  {id:'eleonora',name:'Eleonora',g:'s11',role:'join23',t:'i'},
+  {id:'lloyd',name:'Lloyd',g:'s11',role:'join23',t:'l'},
+  {id:'rufus',name:'Rufus',g:'s11',role:'rally_s3',r3p:8,t:'m'},
+  {id:'hervor',name:'Hervor',g:'s12',role:'join23',t:'i'},
+  {id:'karol',name:'Karol',g:'s12',role:'join23',t:'l'},
+  {id:'ligeia',name:'Ligeia',g:'s12',role:'rally_s3',r3p:9,t:'m'},
+  {id:'gisela',name:'Gisela',g:'s13',role:'join23',t:'i'},
+  {id:'flora',name:'Flora',g:'s13',role:'join23',t:'l'},
+  {id:'vulcanus',name:'Vulcanus',g:'s13',role:'join23',t:'m'},
+  {id:'elif',name:'Elif',g:'s14',role:'join23',t:'i'},
+  {id:'dominic',name:'Dominic',g:'s14',role:'join23',t:'l'},
+  {id:'cara',name:'Cara',g:'s14',role:'join23',t:'m'},
+  {id:'hank',name:'Hank',g:'s15',role:'join23',t:'i'},
+  {id:'estrella',name:'Estrella',g:'s15',role:'join23',t:'l'},
+  {id:'viveca',name:'Viveca',g:'s15',role:'join23',t:'m'},
+  {id:'seigel',name:'Seigel',g:'s16',role:'join23',t:'i'},
+  {id:'ursar',name:'Ursar',g:'s16',role:'join23',t:'l'},
+  {id:'aisling',name:'Aisling',g:'s16',role:'join23',t:'m'},
+  {id:'aiden',name:'Aiden',g:'s17',role:'join23',t:'i'},
+  {id:'bertha',name:'Bertha',g:'s17',role:'join23',t:'l'},
+  {id:'eleanor',name:'Eleanor',g:'s17',role:'join23',t:'m'},
 ];
 const HMAP=Object.fromEntries(HEROES.map(h=>[h.id,h]));
 const GO=['epic','rare','s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11','s12','s13','s14','s15','s16','s17'];
@@ -249,16 +249,16 @@ const TIERS=[
   {id:'t8', label:'T8 · Elite',   short:'T8',  mult:95,   color:'#a78bfa',fc:false},
   {id:'t9', label:'T9 · Supreme', short:'T9',  mult:135,  color:'#e879f9',fc:false},
   {id:'t10',label:'T10 · Apex',   short:'T10', mult:185,  color:'#fde68a',fc:false},
-  {id:'fc1', label:'FC1',         short:'FC1', mult:250,  color:'#fef08a',fc:true},
-  {id:'fc2', label:'FC2',         short:'FC2', mult:330,  color:'#fde047',fc:true},
-  {id:'fc3', label:'FC3',         short:'FC3', mult:425,  color:'#facc15',fc:true},
-  {id:'fc4', label:'FC4',         short:'FC4', mult:535,  color:'#f59e0b',fc:true},
-  {id:'fc5', label:'FC5',         short:'FC5', mult:660,  color:'#f97316',fc:true},
-  {id:'fc6', label:'FC6',         short:'FC6', mult:800,  color:'#ef4444',fc:true},
-  {id:'fc7', label:'FC7',         short:'FC7', mult:960,  color:'#dc2626',fc:true},
-  {id:'fc8', label:'FC8',         short:'FC8', mult:1140, color:'#c026d3',fc:true},
-  {id:'fc9', label:'FC9',         short:'FC9', mult:1340, color:'#a855f7',fc:true},
-  {id:'fc10',label:'FC10',        short:'FC10',mult:1560, color:'#818cf8',fc:true},
+  {id:'fc1', label:'FC1 · Fire Crystal 1',         short:'FC1', mult:250,  color:'#fef08a',fc:true},
+  {id:'fc2', label:'FC2 · Fire Crystal 2',         short:'FC2', mult:330,  color:'#fde047',fc:true},
+  {id:'fc3', label:'FC3 · Fire Crystal 3',         short:'FC3', mult:425,  color:'#facc15',fc:true},
+  {id:'fc4', label:'FC4 · Fire Crystal 4',         short:'FC4', mult:535,  color:'#f59e0b',fc:true},
+  {id:'fc5', label:'FC5 · Fire Crystal 5',         short:'FC5', mult:660,  color:'#f97316',fc:true},
+  {id:'fc6', label:'FC6 · Fire Crystal 6',         short:'FC6', mult:800,  color:'#ef4444',fc:true},
+  {id:'fc7', label:'FC7 · Fire Crystal 7',         short:'FC7', mult:960,  color:'#dc2626',fc:true},
+  {id:'fc8', label:'FC8 · Fire Crystal 8',         short:'FC8', mult:1140, color:'#c026d3',fc:true},
+  {id:'fc9', label:'FC9 · Fire Crystal 9',         short:'FC9', mult:1340, color:'#a855f7',fc:true},
+  {id:'fc10',label:'FC10 · Fire Crystal 10',        short:'FC10',mult:1560, color:'#818cf8',fc:true},
 ];
 
 // ── UTILITIES ─────────────────────────────────────────────────
@@ -299,6 +299,87 @@ function calcHeroScore(hs){
 // Slot 3: any owned hero (slot3_cap heroes only allowed here)
 // Each hero used only once across all squads
 function recommendAll(states,isRally,joinCount,override={}){
+  const o=id=>states[id]?.owned,s=id=>states[id]?.stars??0;
+  const used=new Set();
+  const htype=id=>HMAP[id]?.t; // 'i'|'l'|'m'
+  const capOnly=new Set(HEROES.filter(h=>h.role==='slot3_cap').map(h=>h.id));
+  const joinS1Locked=new Set(['jessie','jasser','seo_yoon','philly']);
+  const seasonPri=h=>h.g==='epic'?0:h.g==='rare'?1:(parseInt(h.g.slice(1))||0)+2;
+  const bySeasonDesc=(a,b)=>seasonPri(b)-seasonPri(a);
+
+  const pick=(candidates)=>{
+    for(const{id,minS=0}of candidates){
+      if(o(id)&&s(id)>=minS&&!used.has(id)){used.add(id);return id;}
+    }
+    return null;
+  };
+
+  // Pool filtered by excluded types — S17 first
+  const flexTyped=(exTypes,excCap=false)=>[...HEROES]
+    .sort(bySeasonDesc)
+    .filter(h=>!exTypes.has(h.t)&&(!excCap||!capOnly.has(h.id))&&!joinS1Locked.has(h.id)&&o(h.id)&&!used.has(h.id))
+    .map(h=>({id:h.id}));
+  const anyTyped=(exTypes)=>[...HEROES]
+    .sort(bySeasonDesc)
+    .filter(h=>!exTypes.has(h.t)&&!joinS1Locked.has(h.id)&&o(h.id)&&!used.has(h.id))
+    .map(h=>({id:h.id}));
+
+  // ── Rally Lead ────────────────────────────────────────────────
+  const rally={s1:null,s2:null,s3:null};
+  if(isRally){
+    // Manual overrides first
+    ['s1','s2','s3'].forEach(slot=>{
+      const id=override[slot];
+      if(id&&o(id)&&!used.has(id)&&!joinS1Locked.has(id)){rally[slot]=id;used.add(id);}
+    });
+    // Slot 1 — Infantry heroes: Jeronimo(3+★) > Hector > Magnus > Gregory
+    if(!rally.s1) rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
+    if(rally.s1||override.s1){
+      const usedT=new Set([htype(rally.s1),htype(override.s1)].filter(Boolean));
+      // Slot 2 — Lancer preferred, no duplicate type
+      if(!rally.s2){
+        if(o('mia')&&s('mia')>=5&&!used.has('mia')&&!usedT.has('l')){rally.s2='mia';used.add('mia');}
+        else rally.s2=pick(
+          [{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'renee'},{id:'reina'}]
+          .filter(c=>!usedT.has(htype(c.id)))
+        );
+        if(!rally.s2) rally.s2=pick(flexTyped(usedT,true));
+      }
+      if(rally.s2) usedT.add(htype(rally.s2));
+      // Slot 3 — Marksman preferred, no duplicate type
+      if(!rally.s3){
+        rally.s3=pick(
+          [{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},
+           {id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]
+          .filter(c=>!usedT.has(htype(c.id)))
+        );
+        if(!rally.s3) rally.s3=pick(anyTyped(usedT));
+      }
+    }
+  }
+
+  // ── Join Squads — one of each type per squad ──────────────────
+  const joinS1Approved=[{id:'jessie'},{id:'jasser'},{id:'seo_yoon'},{id:'philly'}];
+  const dedicatedS1=['jessie','jasser','seo_yoon','philly'];
+  const joins=[];
+  for(let i=0;i<joinCount;i++){
+    let s1=null;
+    if(i<4){const hid=dedicatedS1[i];if(o(hid)&&!used.has(hid)){s1=hid;used.add(hid);}}
+    else s1=pick(joinS1Approved);
+    if(!s1){joins.push({s1:null,s2:null,s3:null});continue;}
+    const squadT=new Set([htype(s1)]);
+    // Slot 2: no cap-only, different type from slot 1
+    const s2=pick(flexTyped(squadT,true));
+    if(s2) squadT.add(htype(s2));
+    // Slot 3: cap-only ok, avoid epics in joins 1-3, different type from slots 1+2
+    const s3pool=i<3
+      ?[...HEROES].sort(bySeasonDesc).filter(h=>h.g!=='epic'&&!joinS1Locked.has(h.id)&&!squadT.has(h.t)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id}))
+      :anyTyped(squadT);
+    const s3=pick(s3pool);
+    joins.push({s1,s2,s3});
+  }
+  return{rally,joins};
+}){
   const o=id=>states[id]?.owned,s=id=>states[id]?.stars??0;
   const used=new Set();
 
@@ -365,25 +446,25 @@ function recommendAll(states,isRally,joinCount,override={}){
       }
     });
     // Auto-fill any slots not overridden
-    if(!rally.s1) rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
+    if(!rally.s1) rally.s1=pick([{id:'jeronimo',minS:3,t:'i'},{id:'hector',t:'i'},{id:'magnus',t:'i'},{id:'gregory',t:'i'}]);
     if(rally.s1||override.s1){
       // Only fill s2/s3 if s1 is filled (either by override or auto)
       if(!rally.s2){
         if(o('mia')&&s('mia')>=5&&!used.has('mia')){rally.s2='mia';used.add('mia');}
         else{
-          rally.s2=pick([{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'renee'},{id:'reina'}]);
+          rally.s2=pick([{id:'molly',t:'l'},{id:'mia',minS:3,t:'l'},{id:'reina',minS:4,t:'l'},{id:'sonya',t:'l'},{id:'renee',t:'l'},{id:'reina',t:'l'}]);
           if(!rally.s2)rally.s2=pick([...HEROES].sort(bySeasonDesc).filter(h=>!capOnly.has(h.id)&&!joinS1Locked.has(h.id)&&o(h.id)&&!used.has(h.id)).map(h=>({id:h.id})));
         }
       }
       if(!rally.s3){
-        rally.s3=pick([{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},{id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]);
+        rally.s3=pick([{id:'ligeia',t:'m'},{id:'rufus',t:'m'},{id:'blanchette',t:'m'},{id:'bradley',t:'m'},{id:'wayne',t:'m'},{id:'gwen',minS:3,t:'m'},{id:'lynn',minS:4,t:'m'},{id:'alonso',t:'m'},{id:'bahiti',t:'m'}]);
         if(!rally.s3)rally.s3=pick(fullAnyPool());
       }
     }
   }
 
   // ── Join Squads — slot 1 strictly approved, slots 2-3 open ──
-  const joinS1Approved=[{id:'jessie'},{id:'jasser'},{id:'seo_yoon'},{id:'philly'}];
+  const joinS1Approved=[{id:'jessie',t:'l'},{id:'jasser',t:'m'},{id:'seo_yoon',t:'m'},{id:'philly',t:'l'}];
 
 
 
@@ -689,12 +770,12 @@ function TroopSection({label,color,data,onChange}){
                 {fmtPower(ni(data[t.id])*t.mult)}</span>}
             </div>
           ))}
-          <div style={{fontSize:9,color:'#f59e0b',letterSpacing:'0.07em',margin:'10px 0 6px',fontWeight:700}}>⚡ FULLY CONQUER</div>
+          <div style={{fontSize:9,color:'#f59e0b',letterSpacing:'0.07em',margin:'10px 0 6px',fontWeight:700}}>🔥 FIRE CRYSTAL</div>
           {TIERS.filter(t=>t.fc).map(t=>(
             <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
               <span style={{fontSize:9,color:t.color,background:`${t.color}22`,borderRadius:4,
                 padding:'2px 6px',fontWeight:700,minWidth:36,textAlign:'center'}}>{t.short}</span>
-              <span style={{fontSize:10,color:'#9d78c0',flex:1}}>Fully Conquer {t.short.slice(2)}</span>
+              <span style={{fontSize:10,color:'#9d78c0',flex:1}}>Fire Crystal {t.short.slice(2)}</span>
               <input type="number" min="0" value={data[t.id]} onChange={e=>onChange({...data,[t.id]:e.target.value})}
                 placeholder="0" style={{width:90,background:'#0d0920',border:'1px solid #f59e0b44',
                   borderRadius:6,color:'#fbbf24',fontSize:12,padding:'4px 8px',
@@ -1020,7 +1101,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
                   display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:900,color:'#fff'}}>2</div>
                 Troop Composition
               </div>
-              <div style={{fontSize:11,color:'#6d4a90',marginBottom:14}}>Expand each type to enter troops by tier · FC = Fully Conquer bonus tiers</div>
+              <div style={{fontSize:11,color:'#6d4a90',marginBottom:14}}>Expand each type to enter troops by tier · FC = Fire Crystal bonus tiers</div>
               <TroopSection label="Infantry"  color="#c084fc" data={infantry}  onChange={setInf}/>
               <TroopSection label="Lancer"    color="#e879f9" data={lancer}    onChange={setLan}/>
               <TroopSection label="Marksman"  color="#fb923c" data={marksman}  onChange={setMark}/>
