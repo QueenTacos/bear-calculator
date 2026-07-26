@@ -192,7 +192,7 @@ const HEROES=[
   {id:'philly',name:'Philly',g:'s2',role:'join_s1',jp:4,t:'l'},
   {id:'alonso',name:'Alonso',g:'s2',role:'rally_s3',r3p:2,t:'m'},
   {id:'logan',name:'Logan',g:'s3',role:'join23',t:'i'},
-  {id:'mia',name:'Mia',g:'s3',role:'rally_s2',r2p:2,minS:3,maxedBest:true},
+  {id:'mia',name:'Mia',g:'s3',role:'rally_s2',r2p:2,minS:3,maxedBest:true,t:'l'},
   {id:'greg_s3',name:'Greg',g:'s3',role:'join23',t:'m'},
   {id:'ahmose',name:'Ahmose',g:'s4',role:'join23',t:'i'},
   {id:'reina',name:'Reina',g:'s4',role:'rally_s2',r2p:3,minS:4,t:'l'},
@@ -336,14 +336,14 @@ function recommendAll(states,isRally,joinCount,override={}){
       if(id&&o(id)&&!used.has(id)&&!joinS1Locked.has(id)){rally[slot]=id;used.add(id);}
     });
     // Slot 1 — Infantry heroes: Jeronimo(3+★) > Hector > Magnus > Gregory
-    if(!rally.s1) rally.s1=pick([{id:'jeronimo',minS:3},{id:'hector'},{id:'magnus'},{id:'gregory'}]);
+    if(!rally.s1) rally.s1=pick([{id:'jeronimo',minS:3,t:'i'},{id:'hector',t:'i'},{id:'magnus',t:'i'},{id:'gregory',t:'i'}]);
     if(rally.s1||override.s1){
       const usedT=new Set([htype(rally.s1),htype(override.s1)].filter(Boolean));
       // Slot 2 — Lancer preferred, no duplicate type
       if(!rally.s2){
         if(o('mia')&&s('mia')>=5&&!used.has('mia')&&!usedT.has('l')){rally.s2='mia';used.add('mia');}
         else rally.s2=pick(
-          [{id:'molly'},{id:'mia',minS:3},{id:'reina',minS:4},{id:'sonya'},{id:'renee'},{id:'reina'}]
+          [{id:'molly',t:'l'},{id:'mia',minS:3,t:'l'},{id:'reina',minS:4,t:'l'},{id:'sonya',t:'l'},{id:'renee',t:'l'},{id:'reina',t:'l'}]
           .filter(c=>!usedT.has(htype(c.id)))
         );
         if(!rally.s2) rally.s2=pick(flexTyped(usedT,true));
@@ -352,8 +352,8 @@ function recommendAll(states,isRally,joinCount,override={}){
       // Slot 3 — Marksman preferred, no duplicate type
       if(!rally.s3){
         rally.s3=pick(
-          [{id:'ligeia'},{id:'rufus'},{id:'blanchette'},{id:'bradley'},{id:'wayne'},
-           {id:'gwen',minS:3},{id:'lynn',minS:4},{id:'alonso'},{id:'bahiti'}]
+          [{id:'ligeia',t:'m'},{id:'rufus',t:'m'},{id:'blanchette',t:'m'},{id:'bradley',t:'m'},{id:'wayne',t:'m'},
+           {id:'gwen',minS:3,t:'m'},{id:'lynn',minS:4,t:'m'},{id:'alonso',t:'m'},{id:'bahiti',t:'m'}]
           .filter(c=>!usedT.has(htype(c.id)))
         );
         if(!rally.s3) rally.s3=pick(anyTyped(usedT));
@@ -362,7 +362,7 @@ function recommendAll(states,isRally,joinCount,override={}){
   }
 
   // ── Join Squads — one of each type per squad ──────────────────
-  const joinS1Approved=[{id:'jessie'},{id:'jasser'},{id:'seo_yoon'},{id:'philly'}];
+  const joinS1Approved=[{id:'jessie',t:'l'},{id:'jasser',t:'m'},{id:'seo_yoon',t:'m'},{id:'philly',t:'l'}];
   const dedicatedS1=['jessie','jasser','seo_yoon','philly'];
   const joins=[];
   for(let i=0;i<joinCount;i++){
