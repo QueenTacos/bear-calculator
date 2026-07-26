@@ -14,6 +14,12 @@ const LS = {
 }
 
 // ── Hybrid storage: localStorage first, Supabase in background ─
+// ── Timeout wrapper — prevents Supabase from hanging forever ─
+const withTimeout=(promise,ms=4000)=>Promise.race([
+  promise,
+  new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms))
+]);
+
 // ── Sync status tracker ──────────────────────────────────────
 let _syncStatus = 'unknown' // 'ok'|'error'|'unknown'
 let _syncError  = null
@@ -25,9 +31,9 @@ export const stor = {
     const key = `syp_player_${gamerID.toLowerCase()}`
     if (supabase) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await withTimeout(supabase
           .from('players').select('*')
-          .eq('gamer_id', gamerID.toLowerCase()).single()
+          .eq('gamer_id', gamerID.toLowerCase()).single())
         if (!error && data?.profile_data) {
           _syncStatus = 'ok'
           LS.set(key, data.profile_data)
@@ -46,11 +52,11 @@ export const stor = {
     LS.set(key, profileData)
     if (supabase) {
       try {
-        const { error } = await supabase.from('players').upsert({
+        const { error } = await withTimeout(supabase.from('players').upsert({
           gamer_id: gamerID.toLowerCase(),
           profile_data: profileData,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'gamer_id' })
+        }), { onConflict: 'gamer_id' })
         if (error) { _syncStatus = 'error'; _syncError = error.message; return false }
         _syncStatus = 'ok'; _syncError = null; return true
       } catch(e) { _syncStatus = 'error'; _syncError = e.message; return false }
@@ -61,9 +67,9 @@ export const stor = {
   async getAllPlayers() {
     if (supabase) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await withTimeout(supabase
           .from('players').select('gamer_id, profile_data, updated_at')
-          .order('updated_at', { ascending: false })
+          .order('updated_at', { ascending: false }))
         if (!error && data) {
           _syncStatus = 'ok'
           data.forEach(r => r.profile_data &&
@@ -80,8 +86,8 @@ export const stor = {
   async getAllHeroImages() {
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('hero_images').select('hero_id, image_data')
+        const { data, error } = await withTimeout(supabase
+          .from('hero_images').select('hero_id, image_data'))
         if (!error && data?.length) {
           const imgs = Object.fromEntries(data.map(r => [r.hero_id, r.image_data]))
           LS.set('syp_hero_images', imgs)
@@ -100,11 +106,11 @@ export const stor = {
     LS.set('syp_hero_images', cache)
     if (supabase) {
       try {
-        const { error } = await supabase.from('hero_images').upsert({
+        const { error } = await withTimeout(supabase.from('hero_images').upsert({
           hero_id: heroId,
           image_data: imageData,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'hero_id' })
+        }), { onConflict: 'hero_id' })
         if (error) { _syncStatus = 'error'; _syncError = `Image sync: ${error.message}`; return false }
         _syncStatus = 'ok'; return true
       } catch(e) { _syncStatus = 'error'; _syncError = e.message; return false }
@@ -116,7 +122,7 @@ export const stor = {
 import { useState, useEffect, useMemo, useCallback } from "react";
 
 // ── CONFIG ────────────────────────────────────────────────────
-const ADMIN_ID   = "yumqueentacos@gmail.com";
+const ADMIN_IDS  = ["yumqueentacos@gmail.com","queentacos","queen tacos","queentacos@gmail.com"];
 const ALLIANCE   = "SYP";
 const ADMIN_NAME = "Queen Tacos";
 
@@ -700,7 +706,7 @@ function LoginView({onLogin}){
     if(!gid.trim()){setErr('Enter your Gamer ID');return;}
     if(pin.length<4){setErr('PIN must be at least 4 characters');return;}
     setBusy(true);
-    const isAdmin=gid.trim().toLowerCase()===ADMIN_ID.toLowerCase();
+    const isAdmin=ADMIN_IDS.map(a=>a.toLowerCase()).includes(gid.trim().toLowerCase());
     const existing=await stor.getPlayer(gid.trim());
     if(mode==='register'){
       if(existing){setErr('Gamer ID already taken — log in instead.');setBusy(false);return;}
