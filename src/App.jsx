@@ -1244,8 +1244,7 @@ function AdminPanel({player,onLogout,onSwitchToPlayer}){
 
   const loadAll=useCallback(async()=>{
     setLoading(true);
-    const idx=await stor.getPlayerIndex();
-    const plist=await Promise.all(idx.map(gid=>stor.get(SK.player(gid),true)));
+    const plist=await stor.getAllPlayers();
     setAllPlayers(plist.filter(Boolean));
     setLoading(false);
   },[]);
