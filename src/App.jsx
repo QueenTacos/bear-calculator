@@ -181,7 +181,7 @@ const HEROES=[
   {id:'bahiti',name:'Bahiti',g:'rare',role:'rally_s3',r3p:1,t:'m'},
   {id:'jasser',name:'Jasser',g:'rare',role:'join_s1',jp:2,t:'m'},
   {id:'seo_yoon',name:'Seo-yoon',g:'rare',role:'join_s1',jp:3,t:'m'},
-  {id:'natalia',name:'Natalia',g:'s1',role:'slot3_cap',t:'l'},
+  {id:'natalia',name:'Natalia',g:'s1',role:'slot3_cap',t:'i'},
   {id:'jeronimo',name:'Jeronimo',g:'s1',role:'rally_s1',r1p:1,minS:3,t:'i'},
   {id:'molly',name:'Molly',g:'s1',role:'rally_s2',r2p:1,t:'l'},
   {id:'zinman',name:'Zinman',g:'s1',role:'slot3_cap',t:'m'},
