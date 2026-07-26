@@ -704,22 +704,33 @@ function LoginView({onLogin}){
     if(pin.length<4){setErr('PIN must be at least 4 characters');return;}
     setBusy(true);
     const isAdmin=ADMIN_IDS.map(a=>a.toLowerCase()).includes(gid.trim().toLowerCase());
-    const existing=await stor.getPlayer(gid.trim());
+    const lsKey=`syp_player_${gid.trim().toLowerCase().replace(/[^a-z0-9@.]/g,'_')}`;
+
     if(mode==='register'){
-      if(existing){setErr('Gamer ID already taken — log in instead.');setBusy(false);return;}
+      // Check localStorage instantly — no network wait
+      if(LS.get(lsKey)){setErr('Gamer ID already taken — log in instead.');setBusy(false);return;}
       const pd={gamerID:gid.trim(),pinHash:hashPin(gid.trim(),pin),isAdmin,
         marchCap:'',joinCount:5,isRally:false,maxSend:false,
         infantry:initTroops(),lancer:initTroops(),marksman:initTroops(),
         heroStates:initHS(),createdAt:Date.now(),updatedAt:Date.now()};
-      await stor.setPlayer(gid.trim(),pd);
-      const idx=await stor.getPlayerIndex();
-      const key=gid.trim().toLowerCase();
-      // index managed automatically by players table
+      LS.set(lsKey,pd); // instant local save
+      stor.setPlayer(gid.trim(),pd).catch(()=>{}); // background Supabase sync
       onLogin(pd);
     } else {
-      if(!existing){setErr('Account not found — register instead.');setBusy(false);return;}
-      if(hashPin(gid.trim(),pin)!==existing.pinHash){setErr('Incorrect PIN.');setBusy(false);return;}
-      onLogin(existing);
+      // Check localStorage first — instant, no network
+      const local=LS.get(lsKey);
+      if(local){
+        if(hashPin(gid.trim(),pin)!==local.pinHash){setErr('Incorrect PIN.');setBusy(false);return;}
+        onLogin(local);
+        // Refresh from Supabase in background
+        stor.getPlayer(gid.trim()).then(r=>{if(r&&(r.updatedAt||0)>(local.updatedAt||0))LS.set(lsKey,r);}).catch(()=>{});
+        return;
+      }
+      // Not cached locally — must hit Supabase (first time on this device)
+      const remote=await stor.getPlayer(gid.trim());
+      if(!remote){setErr('Account not found — register instead.');setBusy(false);return;}
+      if(hashPin(gid.trim(),pin)!==remote.pinHash){setErr('Incorrect PIN.');setBusy(false);return;}
+      onLogin(remote);
     }
     setBusy(false);
   };
