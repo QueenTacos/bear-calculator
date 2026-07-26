@@ -831,6 +831,8 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
   const [pickerSlot,setPickerSlot]=useState(null); // 's1'|'s2'|'s3'|null
   const [syncOk,setSyncOk]=useState(true);
   const [syncMsg,setSyncMsg]=useState('');
+  const [rallyRatio,setRallyRatio]=useState(player.rallyRatio||{inf:5,lan:5,mark:90});
+  const [joinRatio,setJoinRatio]=useState(player.joinRatio||{inf:10,lan:10,mark:80});
 
   const forceSync=useCallback(async()=>{
     setSyncMsg('Syncing…');
@@ -849,8 +851,6 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
     setSyncMsg(ok&&imgOk?'☁ All synced!':s.error||'Sync failed — check Supabase connection');
     setTimeout(()=>setSyncMsg(''),4000);
   },[gid,heroStates,marchCap,joinCount,isRally,maxSend,infantry,lancer,marksman,rallyRatio,joinRatio,rallyOverride]);
-  const [rallyRatio,setRallyRatio]=useState(player.rallyRatio||{inf:5,lan:5,mark:90});
-  const [joinRatio,setJoinRatio]=useState(player.joinRatio||{inf:10,lan:10,mark:80});
   const [submitted,setSubmitted]=useState(false);
 
   // Load all hero images from Supabase (shared across all players)
