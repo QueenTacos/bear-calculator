@@ -26,94 +26,91 @@ let _syncError  = null
 export const getSyncStatus = () => ({ status: _syncStatus, error: _syncError })
 
 export const stor = {
-  // ── Players ──────────────────────────────────────────────────
   async getPlayer(gamerID) {
-    const key = `syp_player_${gamerID.toLowerCase()}`
-    if (supabase) {
-      try {
-        const { data, error } = await withTimeout(supabase
-          .from('players').select('*')
-          .eq('gamer_id', gamerID.toLowerCase()).single())
-        if (!error && data?.profile_data) {
-          _syncStatus = 'ok'
-          LS.set(key, data.profile_data)
-          return data.profile_data
+    const key=`syp_player_${gamerID.toLowerCase()}`
+    if(supabase){
+      try{
+        const {data,error}=await Promise.race([
+          supabase.from('players').select('*').eq('gamer_id',gamerID.toLowerCase()).single(),
+          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+        ])
+        if(!error&&data?.profile_data){
+          _syncStatus='ok'; LS.set(key,data.profile_data); return data.profile_data
         }
-        if (error && error.code !== 'PGRST116') { // PGRST116 = not found (ok)
-          _syncStatus = 'error'; _syncError = error.message
-        }
-      } catch(e) { _syncStatus = 'error'; _syncError = e.message }
+        if(error&&error.code!=='PGRST116'){_syncStatus='error';_syncError=error.message}
+      }catch(e){_syncStatus='error';_syncError=e.message}
     }
     return LS.get(key)
   },
 
-  async setPlayer(gamerID, profileData) {
-    const key = `syp_player_${gamerID.toLowerCase()}`
-    LS.set(key, profileData)
-    if (supabase) {
-      try {
-        const { error } = await withTimeout(supabase.from('players').upsert({
-          gamer_id: gamerID.toLowerCase(),
-          profile_data: profileData,
-          updated_at: new Date().toISOString(),
-        }), { onConflict: 'gamer_id' })
-        if (error) { _syncStatus = 'error'; _syncError = error.message; return false }
-        _syncStatus = 'ok'; _syncError = null; return true
-      } catch(e) { _syncStatus = 'error'; _syncError = e.message; return false }
+  async setPlayer(gamerID,profileData){
+    const key=`syp_player_${gamerID.toLowerCase()}`
+    LS.set(key,profileData)
+    if(supabase){
+      try{
+        const {error}=await Promise.race([
+          supabase.from('players').upsert(
+            {gamer_id:gamerID.toLowerCase(),profile_data:profileData,updated_at:new Date().toISOString()},
+            {onConflict:'gamer_id'}
+          ),
+          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+        ])
+        if(error){_syncStatus='error';_syncError=error.message;return false}
+        _syncStatus='ok';_syncError=null;return true
+      }catch(e){_syncStatus='error';_syncError=e.message;return false}
     }
     return false
   },
 
-  async getAllPlayers() {
-    if (supabase) {
-      try {
-        const { data, error } = await withTimeout(supabase
-          .from('players').select('gamer_id, profile_data, updated_at')
-          .order('updated_at', { ascending: false }))
-        if (!error && data) {
-          _syncStatus = 'ok'
-          data.forEach(r => r.profile_data &&
-            LS.set(`syp_player_${r.gamer_id}`, r.profile_data))
-          return data.map(r => r.profile_data).filter(Boolean)
+  async getAllPlayers(){
+    if(supabase){
+      try{
+        const {data,error}=await Promise.race([
+          supabase.from('players').select('gamer_id,profile_data,updated_at').order('updated_at',{ascending:false}),
+          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+        ])
+        if(!error&&data){
+          _syncStatus='ok'
+          data.forEach(r=>r.profile_data&&LS.set(`syp_player_${r.gamer_id}`,r.profile_data))
+          return data.map(r=>r.profile_data).filter(Boolean)
         }
-        if (error) { _syncStatus = 'error'; _syncError = error.message }
-      } catch(e) { _syncStatus = 'error'; _syncError = e.message }
+        if(error){_syncStatus='error';_syncError=error.message}
+      }catch(e){_syncStatus='error';_syncError=e.message}
     }
-    return LS.keys().filter(k => k.startsWith('syp_player_')).map(k => LS.get(k)).filter(Boolean)
+    return LS.keys().filter(k=>k.startsWith('syp_player_')).map(k=>LS.get(k)).filter(Boolean)
   },
 
-  // ── Hero images — saved one at a time, compressed ─────────────
-  async getAllHeroImages() {
-    if (supabase) {
-      try {
-        const { data, error } = await withTimeout(supabase
-          .from('hero_images').select('hero_id, image_data'))
-        if (!error && data?.length) {
-          const imgs = Object.fromEntries(data.map(r => [r.hero_id, r.image_data]))
-          LS.set('syp_hero_images', imgs)
-          _syncStatus = 'ok'
-          return imgs
+  async getAllHeroImages(){
+    if(supabase){
+      try{
+        const {data,error}=await Promise.race([
+          supabase.from('hero_images').select('hero_id,image_data'),
+          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+        ])
+        if(!error&&data?.length){
+          const imgs=Object.fromEntries(data.map(r=>[r.hero_id,r.image_data]))
+          LS.set('syp_hero_images',imgs);_syncStatus='ok';return imgs
         }
-      } catch(e) { _syncStatus = 'error'; _syncError = e.message }
+      }catch(e){_syncStatus='error';_syncError=e.message}
     }
-    return LS.get('syp_hero_images') || {}
+    return LS.get('syp_hero_images')||{}
   },
 
-  async setHeroImage(heroId, imageData) {
-    // Always update local cache
-    const cache = LS.get('syp_hero_images') || {}
-    cache[heroId] = imageData
-    LS.set('syp_hero_images', cache)
-    if (supabase) {
-      try {
-        const { error } = await withTimeout(supabase.from('hero_images').upsert({
-          hero_id: heroId,
-          image_data: imageData,
-          updated_at: new Date().toISOString(),
-        }), { onConflict: 'hero_id' })
-        if (error) { _syncStatus = 'error'; _syncError = `Image sync: ${error.message}`; return false }
-        _syncStatus = 'ok'; return true
-      } catch(e) { _syncStatus = 'error'; _syncError = e.message; return false }
+  async setHeroImage(heroId,imageData){
+    const cache=LS.get('syp_hero_images')||{}
+    cache[heroId]=imageData; LS.set('syp_hero_images',cache)
+    if(supabase){
+      try{
+        const {error}=await Promise.race([
+          supabase.from('hero_images').upsert(
+            {hero_id:heroId,image_data:imageData,updated_at:new Date().toISOString()},
+            {onConflict:'hero_id'}
+          ),
+          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+        ])
+        if(error){_syncStatus='error';_syncError=`Image: ${error.message}`;return false}
+        _syncStatus='ok';return true
+      }catch(e){_syncStatus='error';_syncError=e.message;return false}
     }
     return false
   },
@@ -814,7 +811,7 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
       if(!supabase){setSyncMsg('⚠ No Supabase config');setSyncOk(false);return;}
       try{
         const res=await withTimeout(
-          supabase.from('players').select('count',{count:'exact',head:true}),3000
+          supabase.from('players').select('gamer_id').limit(1),8000
         );
         if(res.error){setSyncMsg(`DB: ${res.error.message}`);setSyncOk(false);}
         else{setSyncMsg('');setSyncOk(true);}
