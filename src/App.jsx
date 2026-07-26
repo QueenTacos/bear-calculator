@@ -807,6 +807,23 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
   const [pickerSlot,setPickerSlot]=useState(null); // 's1'|'s2'|'s3'|null
   const [syncOk,setSyncOk]=useState(true);
   const [syncMsg,setSyncMsg]=useState('');
+
+  // Test Supabase connection on mount and show exact error
+  useEffect(()=>{
+    (async()=>{
+      if(!supabase){setSyncMsg('⚠ No Supabase config');setSyncOk(false);return;}
+      try{
+        const res=await withTimeout(
+          supabase.from('players').select('count',{count:'exact',head:true}),3000
+        );
+        if(res.error){setSyncMsg(`DB: ${res.error.message}`);setSyncOk(false);}
+        else{setSyncMsg('');setSyncOk(true);}
+      }catch(e){
+        setSyncMsg(`⚠ ${e.message==='timeout'?'Supabase unreachable':e.message}`);
+        setSyncOk(false);
+      }
+    })();
+  },[]);
   const [rallyRatio,setRallyRatio]=useState(player.rallyRatio||{inf:5,lan:5,mark:90});
   const [joinRatio,setJoinRatio]=useState(player.joinRatio||{inf:10,lan:10,mark:80});
 
