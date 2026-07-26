@@ -1368,29 +1368,120 @@ function AdminPanel({player,onLogout,onSwitchToPlayer}){
                     </div>
                     <span style={{color:'#6d4a90'}}>{isExpanded?'▲':'▼'}</span>
                   </div>
-                  {isExpanded&&(
-                    <div style={{padding:'0 16px 16px',borderTop:'1px solid #2d1a4a'}}>
-                      <div style={{fontSize:10,color:'#9d78c0',marginTop:12,marginBottom:8,fontWeight:700,letterSpacing:'0.07em'}}>RECOMMENDED LOADOUT</div>
-                      <div style={{marginBottom:6,fontSize:9,color:'#7c5fa0'}}>
-                        {p.isRally?'🐻 Rally Lead':'🔵 Join Squad'} · {p.joinCount||5} joins
-                      </div>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
-                        <MiniHero heroId={p.isRally?p.recs.rally.s1:p.recs.joins[0]?.s1} heroStates={p.hs} heroImages={{}} label="⚔ SLOT 1"/>
-                        <MiniHero heroId={p.isRally?p.recs.rally.s2:p.recs.joins[0]?.s2} heroStates={p.hs} heroImages={{}} label="🏇 SLOT 2"/>
-                        <MiniHero heroId={p.isRally?p.recs.rally.s3:p.recs.joins[0]?.s3} heroStates={p.hs} heroImages={{}} label="🎯 SLOT 3"/>
-                      </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                        {[{l:'Infantry Power',v:fmtPower(TIERS.reduce((s,t)=>s+ni(p.infantry?.[t.id])*t.mult,0)),c:'#c084fc'},
-                          {l:'Lancer Power',v:fmtPower(TIERS.reduce((s,t)=>s+ni(p.lancer?.[t.id])*t.mult,0)),c:'#e879f9'},
-                          {l:'Marksman Power',v:fmtPower(TIERS.reduce((s,t)=>s+ni(p.marksman?.[t.id])*t.mult,0)),c:'#fb923c'}].map(({l,v,c})=>(
-                          <div key={l} style={{background:'#0a0615',borderRadius:8,padding:'8px',textAlign:'center'}}>
-                            <div style={{fontSize:8,color:'#6d4a90',marginBottom:2}}>{l.toUpperCase()}</div>
-                            <div style={{fontSize:14,fontWeight:800,color:c}}>{v}</div>
+                  {isExpanded&&(()=>{
+                    const allRecs=recommendAll(p.hs||initHS(),p.isRally,p.joinCount||5,p.rallyOverride||{});
+                    const infPow=TIERS.reduce((s,t)=>s+ni(p.infantry?.[t.id])*t.mult,0);
+                    const lanPow=TIERS.reduce((s,t)=>s+ni(p.lancer?.[t.id])*t.mult,0);
+                    const mrkPow=TIERS.reduce((s,t)=>s+ni(p.marksman?.[t.id])*t.mult,0);
+                    const ownedHeroes=HEROES.filter(h=>p.hs?.[h.id]?.owned);
+                    const topTiers=TIERS.filter(t=>ni(p.infantry?.[t.id])||ni(p.lancer?.[t.id])||ni(p.marksman?.[t.id])).reverse();
+                    return(
+                    <div style={{padding:'0 14px 16px',borderTop:'1px solid #2d1a4a'}}>
+
+                      {/* ── Setup Info ── */}
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginTop:12,marginBottom:14}}>
+                        {[
+                          {l:'March Cap',v:p.cap>0?fmt(p.cap):'—',c:'#f59e0b'},
+                          {l:'Join Count',v:p.joinCount||5,c:'#a855f7'},
+                          {l:'Role',v:p.isRally?(p.maxSend?'Rally Max':'Rally Lead'):'Join Only',c:p.isRally?'#f59e0b':'#60a5fa'},
+                          {l:'Heroes Owned',v:ownedHeroes.length+'/65',c:'#e879f9'},
+                        ].map(({l,v,c})=>(
+                          <div key={l} style={{background:'#0a0615',border:`1px solid ${c}33`,borderRadius:8,padding:'8px',textAlign:'center'}}>
+                            <div style={{fontSize:8,color:'#6d4a90',marginBottom:2,letterSpacing:'0.06em'}}>{l.toUpperCase()}</div>
+                            <div style={{fontSize:13,fontWeight:800,color:c}}>{v}</div>
                           </div>
                         ))}
                       </div>
+
+                      {/* ── All Squads ── */}
+                      <div style={{fontSize:10,color:'#9d78c0',fontWeight:700,letterSpacing:'0.07em',marginBottom:8}}>
+                        ALL SQUADS
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+                        {/* Rally squad */}
+                        {p.isRally&&(
+                          <div style={{background:'#1a0d00',border:'1px solid #f59e0b44',borderRadius:9,padding:'8px 12px'}}>
+                            <div style={{fontSize:9,color:'#f59e0b',fontWeight:700,marginBottom:6}}>🐻 RALLY LEAD</div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+                              <MiniHero heroId={allRecs.rally.s1} heroStates={p.hs} heroImages={{}} label="⚔ S1"/>
+                              <MiniHero heroId={allRecs.rally.s2} heroStates={p.hs} heroImages={{}} label="🏇 S2"/>
+                              <MiniHero heroId={allRecs.rally.s3} heroStates={p.hs} heroImages={{}} label="🎯 S3"/>
+                            </div>
+                          </div>
+                        )}
+                        {/* Join squads */}
+                        {allRecs.joins.map((j,ji)=>(
+                          <div key={ji} style={{background:'#0d0920',border:'1px solid #3d1f60',borderRadius:9,padding:'8px 12px'}}>
+                            <div style={{fontSize:9,color:'#a855f7',fontWeight:700,marginBottom:6}}>🔵 JOIN {ji+1}</div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+                              <MiniHero heroId={j.s1} heroStates={p.hs} heroImages={{}} label="S1"/>
+                              <MiniHero heroId={j.s2} heroStates={p.hs} heroImages={{}} label="S2"/>
+                              <MiniHero heroId={j.s3} heroStates={p.hs} heroImages={{}} label="S3"/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* ── Troop Breakdown ── */}
+                      <div style={{fontSize:10,color:'#9d78c0',fontWeight:700,letterSpacing:'0.07em',marginBottom:8}}>TROOPS</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:10}}>
+                        {[
+                          {l:'🛡 Infantry', pow:infPow, c:'#c084fc',
+                            total:TIERS.reduce((s,t)=>s+ni(p.infantry?.[t.id]),0)},
+                          {l:'⚔ Lancer',   pow:lanPow, c:'#e879f9',
+                            total:TIERS.reduce((s,t)=>s+ni(p.lancer?.[t.id]),0)},
+                          {l:'🏹 Marksman', pow:mrkPow, c:'#fb923c',
+                            total:TIERS.reduce((s,t)=>s+ni(p.marksman?.[t.id]),0)},
+                        ].map(({l,pow,c,total})=>(
+                          <div key={l} style={{background:'#0a0615',borderRadius:8,padding:'8px',textAlign:'center'}}>
+                            <div style={{fontSize:9,color:c,fontWeight:700,marginBottom:3}}>{l}</div>
+                            <div style={{fontSize:14,fontWeight:900,color:'#f0e6ff'}}>{fmt(total)}</div>
+                            <div style={{fontSize:10,color:c}}>{fmtPower(pow)}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Top tiers */}
+                      {topTiers.length>0&&(
+                        <div style={{background:'#0a0615',borderRadius:8,padding:'8px 10px',marginBottom:14}}>
+                          <div style={{fontSize:8,color:'#6d4a90',marginBottom:6,letterSpacing:'0.06em'}}>TOP TIERS</div>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                            {topTiers.slice(0,8).map(t=>{
+                              const tot=ni(p.infantry?.[t.id])+ni(p.lancer?.[t.id])+ni(p.marksman?.[t.id]);
+                              return tot>0?(
+                                <span key={t.id} style={{fontSize:9,color:t.color,background:`${t.color}22`,
+                                  borderRadius:4,padding:'2px 7px',fontWeight:700}}>
+                                  {t.short}: {fmt(tot)}
+                                </span>
+                              ):null;
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Hero Roster ── */}
+                      <div style={{fontSize:10,color:'#9d78c0',fontWeight:700,letterSpacing:'0.07em',marginBottom:8}}>
+                        HERO ROSTER ({ownedHeroes.length} owned)
+                      </div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                        {ownedHeroes.map(h=>{
+                          const g=GRP[h.g];
+                          const stars=p.hs?.[h.id]?.stars||0;
+                          return(
+                            <div key={h.id} style={{
+                              background:g.bg,border:`1px solid ${g.border}`,
+                              borderRadius:7,padding:'4px 7px',
+                              display:'flex',alignItems:'center',gap:5,
+                            }}>
+                              <span style={{fontSize:9,fontWeight:700,color:g.accent}}>{h.name}</span>
+                              {stars>0&&<span style={{fontSize:8,color:'#fbbf24'}}>{'★'.repeat(stars)}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
