@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 // ── Supabase client (may be null if env vars not set) ────────
-const _sbUrl = import.meta.env.VITE_SUPABASE_URL
+const _sbUrl = (import.meta.env.VITE_SUPABASE_URL||'').split('/rest/')[0].replace(/\/$/,'')
 const _sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const supabase = (_sbUrl && _sbKey) ? createClient(_sbUrl, _sbKey) : null
 
