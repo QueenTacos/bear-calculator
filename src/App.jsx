@@ -27,6 +27,7 @@ export const getSyncStatus = () => ({ status: _syncStatus, error: _syncError })
 
 export const stor = {
   async getPlayer(gamerID) {
+    migratePlayer(gamerID); // recover data from old key formats
     const key=`syp_player_${gamerID.toLowerCase()}`
     if(supabase){
       try{
@@ -81,6 +82,7 @@ export const stor = {
   },
 
   async getAllHeroImages(){
+    migrateImages(); // recover images from old key formats
     if(supabase){
       try{
         const {data,error}=await Promise.race([
@@ -704,7 +706,7 @@ function LoginView({onLogin}){
     if(pin.length<4){setErr('PIN must be at least 4 characters');return;}
     setBusy(true);
     const isAdmin=ADMIN_IDS.map(a=>a.toLowerCase()).includes(gid.trim().toLowerCase());
-    const lsKey=`syp_player_${gid.trim().toLowerCase().replace(/[^a-z0-9@.]/g,'_')}`;
+    const lsKey=`syp_player_${gid.trim().toLowerCase()}`; migratePlayer(gid.trim());
 
     if(mode==='register'){
       // Check localStorage instantly — no network wait
