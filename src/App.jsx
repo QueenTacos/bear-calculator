@@ -82,25 +82,42 @@ export const stor = {
   },
 
   async getAllHeroImages(){
-    migrateImages(); // recover images from old key formats
+    // Load individually per hero — faster, no blob size issue
+    const imgs={}
+    const heroIds=['smith','eugene','charlie','cloris','sergey','jessie','patrick','lumak',
+      'ling_xue','gina','bahiti','jasser','seo_yoon','natalia','jeronimo','molly','zinman',
+      'flint','philly','alonso','logan','mia','greg_s3','ahmose','reina','lynn','hector',
+      'norah','gwen','wu_ming','renee','wayne','edith','gordon','bradley','gatot','sonya',
+      'hendrik','magnus','fred','xura','gregory','freya','blanchette','eleonora','lloyd',
+      'rufus','hervor','karol','ligeia','gisela','flora','vulcanus','elif','dominic','cara',
+      'hank','estrella','viveca','seigel','ursar','aisling','aiden','bertha','eleanor'];
+    // Check localStorage first (instant)
+    heroIds.forEach(id=>{
+      const v=LS.getRaw(`syp_img_${id}`);
+      if(v) imgs[id]=v;
+      else{
+        // Also check old blob format as fallback
+        try{const old=LS.get('syp_hero_images');if(old?.[id])imgs[id]=old[id];}catch{}
+      }
+    });
+    // Sync from Supabase in background (don't block UI)
     if(supabase){
-      try{
-        const {data,error}=await Promise.race([
-          supabase.from('hero_images').select('hero_id,image_data'),
-          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
-        ])
+      Promise.race([
+        supabase.from('hero_images').select('hero_id,image_data'),
+        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+      ]).then(({data,error})=>{
         if(!error&&data?.length){
-          const imgs=Object.fromEntries(data.map(r=>[r.hero_id,r.image_data]))
-          LS.set('syp_hero_images',imgs);_syncStatus='ok';return imgs
+          data.forEach(r=>{if(r.image_data)LS.setRaw(`syp_img_${r.hero_id}`,r.image_data)});
         }
-      }catch(e){_syncStatus='error';_syncError=e.message}
+      }).catch(()=>{});
     }
-    return LS.get('syp_hero_images')||{}
+    return imgs;
   },
 
   async setHeroImage(heroId,imageData){
-    const cache=LS.get('syp_hero_images')||{}
-    cache[heroId]=imageData; LS.set('syp_hero_images',cache)
+    // Save individually — each image is its own key, raw (no JSON wrapper)
+    try{LS.setRaw(`syp_img_${heroId}`,imageData);}
+    catch(e){_syncError='Storage full — clear old data';return false;}
     if(supabase){
       try{
         const {error}=await Promise.race([
@@ -114,7 +131,7 @@ export const stor = {
         _syncStatus='ok';return true
       }catch(e){_syncStatus='error';_syncError=e.message;return false}
     }
-    return false
+    return true
   },
 }
 
@@ -126,7 +143,7 @@ const ALLIANCE   = "SYP";
 const ADMIN_NAME = "Queen Tacos";
 
 // ── IMAGE COMPRESSION — max 80px, JPEG 0.65 keeps images under 30KB each
-async function compressToBase64(file, maxPx=80, quality=0.65) {
+async function compressToBase64(file, maxPx=72, quality=0.6) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
