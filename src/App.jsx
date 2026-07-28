@@ -129,8 +129,16 @@ export const stor = {
 
   async setHeroImage(heroId,imageData){
     // Save individually — each image is its own key, raw (no JSON wrapper)
-    try{LS.setRaw(`syp_img_${heroId}`,imageData);}
-    catch(e){_syncError='Storage full — clear old data';return false;}
+    // First check size — base64 should be under 20KB at our compression
+    if(imageData&&imageData.length>50000){
+      _syncError='Image too large — will only sync to cloud';
+    } else {
+      try{LS.setRaw(`syp_img_${heroId}`,imageData);}
+      catch(e){
+        _syncError='Storage full — tap Clear Cache in Heroes tab';
+        // Still try Supabase even if local fails
+      }
+    }
     if(supabase){
       try{
         const {error}=await Promise.race([
@@ -156,7 +164,7 @@ const ALLIANCE   = "SYP";
 const ADMIN_NAME = "Queen Tacos";
 
 // ── IMAGE COMPRESSION — max 80px, JPEG 0.65 keeps images under 30KB each
-async function compressToBase64(file, maxPx=72, quality=0.6) {
+async function compressToBase64(file, maxPx=48, quality=0.4) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -996,9 +1004,26 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
                 <span style={{fontSize:10,color:'#6d4a90'}}>Portraits not saving? Clear old cache first</span>
                 <button onClick={()=>{
                   try{
-                    ['syp_hero_images','syp-hero-images','wos-hero-images'].forEach(k=>{try{localStorage.removeItem(k);}catch{}});
-                    Object.keys(localStorage).filter(k=>k.startsWith('wos-')).forEach(k=>{try{localStorage.removeItem(k);}catch{}});
-                    alert('Storage cleared! Portrait uploads will now work.');
+                    // Remove ALL image-related keys
+                    const keep=new Set(
+                      Object.keys(localStorage).filter(k=>
+                        k.startsWith('syp_player_')|| // player profiles
+                        k.startsWith('syp_hero_states') // hero owned/stars
+                      )
+                    );
+                    const toDelete=Object.keys(localStorage).filter(k=>{
+                      if(keep.has(k)) return false;
+                      // Keep only non-image keys
+                      if(k.startsWith('syp_img_')) return true;
+                      if(k.startsWith('syp_hero')) return true;
+                      if(k.startsWith('wos-')) return true;
+                      if(k.startsWith('syp-')) return true;
+                      if(k==='syp_hero_images') return true;
+                      return false;
+                    });
+                    toDelete.forEach(k=>{try{localStorage.removeItem(k);}catch{}});
+                    alert(`Cleared ${toDelete.length} old image keys. Now re-upload your portraits.`);
+                    window.location.reload();
                   }catch(e){alert('Error: '+e.message);}
                 }} style={{background:'#3d0a0a',border:'1px solid #ef444466',borderRadius:7,
                   color:'#f87171',fontSize:10,fontWeight:700,padding:'4px 12px',
