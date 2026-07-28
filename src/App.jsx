@@ -705,36 +705,50 @@ function LoginView({onLogin}){
     if(!gid.trim()){setErr('Enter your Gamer ID');return;}
     if(pin.length<4){setErr('PIN must be at least 4 characters');return;}
     setBusy(true);
-    const isAdmin=ADMIN_IDS.map(a=>a.toLowerCase()).includes(gid.trim().toLowerCase());
-    const lsKey=`syp_player_${gid.trim().toLowerCase()}`; migratePlayer(gid.trim());
+    // Hard 10-second timeout on entire login so it never hangs forever
+    const loginTimeout=setTimeout(()=>{
+      setBusy(false);setErr('Connection timed out — check your internet and try again.');
+    },10000);
+    try{
+      const isAdmin=ADMIN_IDS.map(a=>a.toLowerCase()).includes(gid.trim().toLowerCase());
+      const key=`syp_player_${gid.trim().toLowerCase()}`;
+      // Try migration silently
+      try{migratePlayer(gid.trim());}catch(_){}
+      const local=LS.get(key);
 
-    if(mode==='register'){
-      // Check localStorage instantly — no network wait
-      if(LS.get(lsKey)){setErr('Gamer ID already taken — log in instead.');setBusy(false);return;}
-      const pd={gamerID:gid.trim(),pinHash:hashPin(gid.trim(),pin),isAdmin,
-        marchCap:'',joinCount:5,isRally:false,maxSend:false,
-        infantry:initTroops(),lancer:initTroops(),marksman:initTroops(),
-        heroStates:initHS(),createdAt:Date.now(),updatedAt:Date.now()};
-      LS.set(lsKey,pd); // instant local save
-      stor.setPlayer(gid.trim(),pd).catch(()=>{}); // background Supabase sync
-      onLogin(pd);
-    } else {
-      // Check localStorage first — instant, no network
-      const local=LS.get(lsKey);
-      if(local){
-        if(hashPin(gid.trim(),pin)!==local.pinHash){setErr('Incorrect PIN.');setBusy(false);return;}
-        onLogin(local);
-        // Refresh from Supabase in background
-        stor.getPlayer(gid.trim()).then(r=>{if(r&&(r.updatedAt||0)>(local.updatedAt||0))LS.set(lsKey,r);}).catch(()=>{});
-        return;
+      if(mode==='register'){
+        if(local){clearTimeout(loginTimeout);setErr('Gamer ID already taken — log in instead.');setBusy(false);return;}
+        // Also check Supabase quickly (2s) in case registered on another device
+        let remoteExists=false;
+        try{const r=await Promise.race([stor.getPlayer(gid.trim()),new Promise((_,rj)=>setTimeout(()=>rj(new Error('t')),2000))]);
+          if(r)remoteExists=true;}catch(_){}
+        if(remoteExists){clearTimeout(loginTimeout);setErr('Gamer ID already taken — log in instead.');setBusy(false);return;}
+        const pd={gamerID:gid.trim(),pinHash:hashPin(gid.trim(),pin),isAdmin,
+          marchCap:'',joinCount:5,isRally:false,maxSend:false,
+          infantry:initTroops(),lancer:initTroops(),marksman:initTroops(),
+          heroStates:initHS(),createdAt:Date.now(),updatedAt:Date.now()};
+        LS.set(key,pd);
+        stor.setPlayer(gid.trim(),pd).catch(()=>{});
+        clearTimeout(loginTimeout);onLogin(pd);
+      } else {
+        if(local){
+          if(hashPin(gid.trim(),pin)!==local.pinHash){clearTimeout(loginTimeout);setErr('Incorrect PIN.');setBusy(false);return;}
+          clearTimeout(loginTimeout);onLogin(local);
+          stor.getPlayer(gid.trim()).then(r=>{if(r&&(r.updatedAt||0)>(local.updatedAt||0))LS.set(key,r);}).catch(()=>{});
+          return;
+        }
+        // Not local — try Supabase
+        let remote=null;
+        try{remote=await Promise.race([stor.getPlayer(gid.trim()),new Promise((_,rj)=>setTimeout(()=>rj(new Error('t')),8000))]);}catch(_){}
+        if(!remote){clearTimeout(loginTimeout);setErr('Account not found. Register or try another device.');setBusy(false);return;}
+        if(hashPin(gid.trim(),pin)!==remote.pinHash){clearTimeout(loginTimeout);setErr('Incorrect PIN.');setBusy(false);return;}
+        clearTimeout(loginTimeout);onLogin(remote);
       }
-      // Not cached locally — must hit Supabase (first time on this device)
-      const remote=await stor.getPlayer(gid.trim());
-      if(!remote){setErr('Account not found — register instead.');setBusy(false);return;}
-      if(hashPin(gid.trim(),pin)!==remote.pinHash){setErr('Incorrect PIN.');setBusy(false);return;}
-      onLogin(remote);
+    }catch(e){
+      clearTimeout(loginTimeout);
+      setErr('Error: '+e.message);
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const inp={width:'100%',boxSizing:'border-box',background:'#0a0615',
