@@ -92,13 +92,26 @@ export const stor = {
       'rufus','hervor','karol','ligeia','gisela','flora','vulcanus','elif','dominic','cara',
       'hank','estrella','viveca','seigel','ursar','aisling','aiden','bertha','eleanor'];
     // Check localStorage first (instant)
+    // One-time migration: move old blob to individual keys and free the space
+    try{
+      const oldBlob=LS.get('syp_hero_images');
+      if(oldBlob&&typeof oldBlob==='object'){
+        Object.entries(oldBlob).forEach(([id,data])=>{
+          if(data){try{LS.setRaw(`syp_img_${id}`,data);}catch{}}
+        });
+        try{localStorage.removeItem('syp_hero_images');}catch{}
+        console.log('Migrated hero image blob to individual keys');
+      }
+    }catch{}
+    // Also clear any other stale large keys
+    try{
+      ['syp-hero-images','wos-hero-images','hero_images_cache'].forEach(k=>{
+        if(localStorage.getItem(k))localStorage.removeItem(k);
+      });
+    }catch{}
     heroIds.forEach(id=>{
       const v=LS.getRaw(`syp_img_${id}`);
       if(v) imgs[id]=v;
-      else{
-        // Also check old blob format as fallback
-        try{const old=LS.get('syp_hero_images');if(old?.[id])imgs[id]=old[id];}catch{}
-      }
     });
     // Sync from Supabase in background (don't block UI)
     if(supabase){
@@ -967,14 +980,29 @@ function PlayerApp({player,onLogout,onSwitchToAdmin}){
         {tab==='heroes'&&(
           <div>
             <div style={{background:'#1a0b35',border:'1px solid #3d1f60',borderRadius:12,
-              padding:'12px 16px',marginBottom:18,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:800}}>Hero Roster</div>
-                <div style={{fontSize:11,color:'#7c5fa0'}}>Tap card to own · 📷 to upload portrait · ★ to set stars</div>
+              padding:'12px 16px',marginBottom:18}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800}}>Hero Roster</div>
+                  <div style={{fontSize:11,color:'#7c5fa0'}}>Tap card to own · 📷 to upload portrait · ★ to set stars</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:20,fontWeight:900,color:'#e879f9'}}>{ownedCount}<span style={{fontSize:11,color:'#6d4a90'}}>/65</span></div>
+                  <div style={{fontSize:9,color:'#6d4a90'}}>{imgCount} portraits</div>
+                </div>
               </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontSize:20,fontWeight:900,color:'#e879f9'}}>{ownedCount}<span style={{fontSize:11,color:'#6d4a90'}}>/65</span></div>
-                <div style={{fontSize:9,color:'#6d4a90'}}>{imgCount} portraits</div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+                paddingTop:8,borderTop:'1px solid #2d1a4a'}}>
+                <span style={{fontSize:10,color:'#6d4a90'}}>Portraits not saving? Clear old cache first</span>
+                <button onClick={()=>{
+                  try{
+                    ['syp_hero_images','syp-hero-images','wos-hero-images'].forEach(k=>{try{localStorage.removeItem(k);}catch{}});
+                    Object.keys(localStorage).filter(k=>k.startsWith('wos-')).forEach(k=>{try{localStorage.removeItem(k);}catch{}});
+                    alert('Storage cleared! Portrait uploads will now work.');
+                  }catch(e){alert('Error: '+e.message);}
+                }} style={{background:'#3d0a0a',border:'1px solid #ef444466',borderRadius:7,
+                  color:'#f87171',fontSize:10,fontWeight:700,padding:'4px 12px',
+                  cursor:'pointer',fontFamily:'inherit'}}>🗑 Clear Cache</button>
               </div>
             </div>
             {GO.map(gid2=>{
